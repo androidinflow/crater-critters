@@ -1,0 +1,15 @@
+{
+  "name": "Crater Critters",
+  "short_name": "Critters",
+  "description": "Turn-based artillery brawl with googly-eyed hedgehogs. Play offline or online with a friend.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#1b2a4a",
+  "theme_color": "#1b2a4a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

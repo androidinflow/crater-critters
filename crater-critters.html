@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#1b2a4a">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Critters">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Crater Critters</title>
 <style>
   :root{
@@ -72,6 +77,24 @@
   #touch .acts [data-k=Enter]{right:96px;bottom:0;font-size:13px}
   #touch .acts #tWeap{right:96px;bottom:70px;font-size:12px}
   #touch #tPause{right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));width:44px;height:44px;font-size:16px}
+  #touch #tFull{right:calc(62px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));width:44px;height:44px;font-size:18px}
+  /* chat */
+  #chat{position:fixed;inset:0;pointer-events:none;z-index:6}
+  #chatBtn{pointer-events:auto;position:absolute;right:16px;top:30px;padding:4px 10px;font-size:13px;border-radius:10px;background:rgba(255,246,227,.85)}
+  #chatBtn .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff4d6d;margin-left:4px;vertical-align:middle}
+  body.touchy #chatBtn{right:calc(114px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));height:44px;border-radius:22px;padding:0 12px;box-shadow:0 3px 0 rgba(43,29,18,.8)}
+  #chatLog{position:absolute;left:14px;bottom:118px;width:min(340px,70vw);display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+  body.touchy #chatLog{left:auto;right:calc(10px + env(safe-area-inset-right));top:150px;bottom:auto;align-items:flex-end;width:min(280px,48vw)}
+  .msg{background:rgba(20,12,6,.72);color:#fff;border-radius:10px;padding:4px 9px;font-size:13px;line-height:1.25;max-width:100%;word-wrap:break-word;
+    animation:msgFade 11s forwards;text-shadow:1px 1px 0 #000}
+  .msg b{margin-right:4px}
+  #chat.open .msg{animation:none;opacity:1}
+  @keyframes msgFade{0%{opacity:0;transform:translateY(6px)}4%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
+  #chatForm{pointer-events:auto;position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(440px,94vw);
+    background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);padding:8px;box-sizing:border-box}
+  #chatForm .row{margin:0;flex-wrap:nowrap} #chatInput{flex:1;min-width:0;font-size:16px}
+  .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .quick button{padding:3px 9px;font-size:13px;border-width:2px;box-shadow:0 2px 0 var(--ink)}
   @media (max-height:420px){ #touch button{width:50px;height:50px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} }
   @media (max-width:640px){ .grid2{grid-template-columns:1fr} .help{columns:1} h1.logo{font-size:34px} }
 </style>
@@ -85,6 +108,17 @@
     <button data-k="ArrowRight" aria-label="Walk right">▶</button><button data-k="ArrowDown" aria-label="Aim down">▼</button></div>
   <div class="acts"><button id="tWeap" aria-label="Weapons">ARMS</button><button data-k="Enter" aria-label="Jump">JUMP</button><button data-k="Space" aria-label="Fire">FIRE</button></div>
   <button id="tPause" aria-label="Pause">❚❚</button>
+  <button id="tFull" aria-label="Fullscreen">⛶</button>
+</div>
+
+<!-- ===== Chat (online matches) ===== -->
+<div id="chat" class="hidden">
+  <button id="chatBtn" aria-label="Chat">Chat<span class="dot hidden" id="chatDot"></span></button>
+  <div id="chatLog"></div>
+  <form id="chatForm" class="hidden" autocomplete="off">
+    <div class="row"><input id="chatInput" maxlength="120" placeholder="Say something…" enterkeyhint="send"><button type="submit">Send</button><button type="button" id="chatClose" aria-label="Close chat">✕</button></div>
+    <div class="quick" id="quickChat"></div>
+  </form>
 </div>
 
 <!-- ===== Main menu ===== -->
@@ -93,6 +127,7 @@
     <canvas id="mascot" width="420" height="96"></canvas>
     <h1 class="logo">Crater Critters</h1>
     <p class="tag">Small. Round. Extremely explosive.</p>
+    <p class="small center hidden" id="iosTip">📱 iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
     <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
     <div id="teamList"></div>
     <div class="grid2">
@@ -130,7 +165,7 @@
 <div id="pause" class="overlay hidden">
   <div class="panel center"><h2>Paused</h2><p id="pauseNote" class="small hidden">Online match – the game keeps running!</p>
     <div class="actions" style="flex-direction:column">
-      <button id="resumeBtn">Resume</button><button id="pauseHelpBtn">Controls</button><button id="quitBtn">Quit to menu</button>
+      <button id="resumeBtn">Resume</button><button id="pauseFull">Fullscreen</button><button id="pauseHelpBtn">Controls</button><button id="quitBtn">Quit to menu</button>
     </div></div>
 </div>
 
@@ -150,7 +185,8 @@
       <div>Jetpack: <kbd>↑</kbd> thrust, <kbd>←</kbd><kbd>→</kbd> steer, <kbd>Space</kbd> stop</div>
       <div>Robot: <kbd>Space</kbd> again to detonate</div>
       <div>Drag mouse to pan · scroll to zoom</div>
-      <div><kbd>Esc</kbd>/<kbd>P</kbd> pause · <kbd>H</kbd> help · <kbd>M</kbd> mute</div>
+      <div><kbd>Esc</kbd>/<kbd>P</kbd> pause · <kbd>H</kbd> help · <kbd>M</kbd> mute · <kbd>F</kbd> fullscreen</div>
+      <div>Online: <kbd>T</kbd> or the Chat button to talk to your friend</div>
       <div>Touch: D-pad walks &amp; aims, hold FIRE to charge, tap the map to target, drag to pan, pinch to zoom</div>
       <div>After firing you get 3 seconds to run away!</div>
       <div>Water and the map edges are instant doom.</div>
@@ -1462,6 +1498,8 @@ window.addEventListener('keydown', e => {
   if (!e.repeat) {
     if (e.code === 'Escape' || e.code === 'KeyP') { UI.togglePause(); return; }
     if (e.code === 'KeyH' || e.code === 'F1') { e.preventDefault(); UI.toggleHelp(); return; }
+    if (e.code === 'KeyT' && Chat.available()) { e.preventDefault(); Chat.open(); return; }
+    if (e.code === 'KeyF') { Full.toggle(); return; }
     if (e.code === 'KeyM') { Sfx.muted = !Sfx.muted; banner(Sfx.muted ? 'Sound off' : 'Sound on'); return; }
     if (e.code === 'Tab') { UI.togglePicker(); return; }
     Input.pressed.add(e.code);
@@ -1527,6 +1565,7 @@ function bindTouchButtons() {
   }
   $('tWeap').addEventListener('click', () => UI.togglePicker());
   $('tPause').addEventListener('click', () => UI.togglePause());
+  $('tFull').addEventListener('click', () => Full.toggle());
 }
 // Is the critter being controlled right now driven by *this* browser?
 function myTurn() { return g.state === 'turn' && g.active && (!g.online || g.active.team.idx === Net.myTeam); }
@@ -1972,7 +2011,7 @@ const UI = {
     const bindSel = (id, key, num) => { const el = $(id); el.value = String(settings[key]); el.onchange = () => { settings[key] = num ? +el.value : el.value; saveSettings(); }; };
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('mapStyle', 'map'); bindSel('scheme', 'scheme');
   },
-  showMenu() { if (Net.role) { Net.send({ t: 'bye' }); Net.leave(); } this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
+  showMenu() { if (Net.role) { Net.send({ t: 'bye' }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
   hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
@@ -2005,7 +2044,7 @@ const UI = {
     $('winSub').textContent = w ? `Survivors: ${w.critters.filter(c => c.alive).map(c => c.name).join(', ')}` : 'Everybody went sploosh.';
   },
 };
-$('startBtn').onclick = () => { Sfx.init(); saveSettings(); UI.hideAll(); newGame(); };
+$('startBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); UI.hideAll(); newGame(); };
 $('helpBtn').onclick = () => UI.toggleHelp();
 $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
@@ -2017,8 +2056,8 @@ $('rematchBtn').onclick = () => {
   else if (Net.role === 'host') Net.startGame(Net.guestInfo);
   else newGame();
 };
-$('hostBtn').onclick = () => { Sfx.init(); saveSettings(); Net.host(); };
-$('joinBtn').onclick = () => { Sfx.init(); saveSettings(); const code = $('joinCode').value.trim().toUpperCase(); if (code.length < 4) { $('joinCode').focus(); return; } Net.join(code); };
+$('hostBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); Net.host(); };
+$('joinBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); const code = $('joinCode').value.trim().toUpperCase(); if (code.length < 4) { $('joinCode').focus(); return; } Net.join(code); };
 $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinBtn').click(); });
 $('lobbyCancel').onclick = () => UI.showMenu();
 $('menuBtn').onclick = () => UI.showMenu();
@@ -2319,6 +2358,7 @@ function frame(now) {
   Net.update(real);
   render();
   const inMenu = !$('menu').classList.contains('hidden') || !$('lobby').classList.contains('hidden');
+  if (Chat.available() === $('chat').classList.contains('hidden')) Chat.sync();
   if (inMenu !== UI.inMenu) { UI.inMenu = inMenu; $('touch').style.visibility = inMenu ? 'hidden' : ''; }
   if (!$('menu').classList.contains('hidden')) drawMascots(now / 1000);
   requestAnimationFrame(frame);
@@ -2405,6 +2445,7 @@ const Net = {
       teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
   },
   onMsg(m) {
+    if (m.t === 'chat') { Chat.add(String(m.n || 'Friend').slice(0, 18), m.c, String(m.x || '').slice(0, 120), false); return; }
     if (m.t === 'bye') { UI.netStatus('Your friend left the game.'); this.peerLost = true; return; }
     if (this.role === 'host') {
       switch (m.t) {
@@ -2562,11 +2603,88 @@ function guestTick(dt) {
   if (g.overT > 0 && (g.overT -= dt) <= 0) UI.showOver();
 }
 
+
+// ============================== CHAT + FULLSCREEN ==============================
+// Chat rides on the same Realtime channel as the game ({t:'chat'} messages). Text is only
+// ever inserted with textContent, never as HTML.
+const Chat = {
+  isOpen: false, lastSend: 0,
+  QUICK: ['Nice shot!', 'Oops 😅', 'Ha! Missed!', 'GG', 'Revenge time!', 'Hurry up! ⏳'],
+  available() { return !!(g && g.online && Net.role && Net.started); },
+  me() { const t = g.teams[Net.myTeam] || settings.teams[0]; return { n: t.name, c: t.color || TEAM_COLORS[settings.teams[0].color] }; },
+  sync() { $('chat').classList.toggle('hidden', !this.available()); if (!this.available() && this.isOpen) this.close(); },
+  open() {
+    if (!this.available()) return;
+    this.isOpen = true; $('chatForm').classList.remove('hidden'); $('chat').classList.add('open'); $('chatDot').classList.add('hidden');
+    for (const k in Input.down) Input.down[k] = false;   // let go of any held game keys
+    setTimeout(() => $('chatInput').focus(), 0);
+  },
+  close() { this.isOpen = false; $('chatForm').classList.add('hidden'); $('chat').classList.remove('open'); $('chatInput').blur(); },
+  send(text) {
+    text = text.trim().slice(0, 120); if (!text || !this.available()) return;
+    const now = performance.now(); if (now - this.lastSend < 400) return; this.lastSend = now;
+    const me = this.me(); Net.send({ t: 'chat', n: me.n, c: me.c, x: text }); this.add(me.n, me.c, text, true);
+  },
+  add(name, color, text, mine) {
+    const log = $('chatLog'), d = document.createElement('div'), b = document.createElement('b');
+    d.className = 'msg'; b.textContent = name + ':'; b.style.color = /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#ffd23f';
+    d.append(b, document.createTextNode(text)); log.appendChild(d);
+    while (log.children.length > 6) log.firstChild.remove();
+    if (!mine) { NET_FN['s.blip'](620, 2); if (!this.isOpen) $('chatDot').classList.remove('hidden'); }
+  },
+  reset() { this.close(); $('chatLog').innerHTML = ''; $('chatDot').classList.add('hidden'); $('chat').classList.add('hidden'); },
+  init() {
+    for (const q of this.QUICK) { const b = document.createElement('button'); b.type = 'button'; b.textContent = q; b.onclick = () => { this.send(q); this.close(); }; $('quickChat').appendChild(b); }
+    $('chatBtn').onclick = () => (this.isOpen ? this.close() : this.open());
+    $('chatClose').onclick = () => this.close();
+    $('chatForm').onsubmit = e => { e.preventDefault(); this.send($('chatInput').value); $('chatInput').value = ''; this.close(); };
+    $('chatInput').addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); this.close(); } e.stopPropagation(); });
+  },
+};
+// Fullscreen: the Fullscreen API hides the address bar on Android/desktop; iPhone Safari has no
+// element fullscreen, so there we point players to "Add to Home Screen" (the manifest opens it
+// fullscreen, landscape).
+const Full = {
+  el: document.documentElement,
+  supported() { return !!(this.el.requestFullscreen || this.el.webkitRequestFullscreen); },
+  active() { return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+  standalone() { return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches); },
+  enter() {
+    if (this.active() || !this.supported()) return;
+    const p = this.el.requestFullscreen ? this.el.requestFullscreen({ navigationUI: 'hide' }) : this.el.webkitRequestFullscreen();
+    if (p && p.then) p.then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } }).catch(() => { });
+  },
+  exit() { const f = document.exitFullscreen || document.webkitExitFullscreen; if (f && this.active()) try { f.call(document); } catch (e) { } },
+  toggle() {
+    if (!this.supported()) { if (!this.standalone()) banner(/iP(hone|od)/.test(navigator.userAgent) ? 'iPhone: Share → Add to Home Screen' : 'Fullscreen not supported here'); return; }
+    this.active() ? this.exit() : this.enter();
+  },
+  auto() { if (UI.touch && !this.standalone()) this.enter(); },   // phones: go fullscreen when a match starts
+  init() {
+    const ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (ios && !this.supported() && !this.standalone()) $('iosTip').classList.remove('hidden');
+    $('tFull').classList.toggle('hidden', this.standalone() || (!this.supported() && !ios));
+    $('pauseFull').onclick = () => this.toggle();
+    const upd = () => { $('tFull').textContent = this.active() ? '✕' : '⛶'; setTimeout(resize, 60); };
+    document.addEventListener('fullscreenchange', upd); document.addEventListener('webkitfullscreenchange', upd);
+    // home-screen icon for iOS: render the mascot to a PNG
+    try {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 180; const x = cv.getContext('2d');
+      const gr = x.createLinearGradient(0, 0, 0, 180); gr.addColorStop(0, '#5fa8e8'); gr.addColorStop(1, '#bfe3ff'); x.fillStyle = gr; x.fillRect(0, 0, 180, 180);
+      x.fillStyle = '#4caf50'; x.fillRect(0, 140, 180, 40);
+      const m = Object.assign(new Critter({ color: TEAM_COLORS[0] }, ''), { x: 90, y: 98, r: 40, facing: 1, mode: 'ground', px: 1, py: 0.5 });
+      drawCritter(x, m, 0);
+      const l = document.createElement('link'); l.rel = 'apple-touch-icon'; l.href = cv.toDataURL('image/png'); document.head.appendChild(l);
+    } catch (e) { }
+  },
+};
+
 // boot
 resize();
 Terrain.init();
 bindPointer(canvas);
 bindTouchButtons();
+Chat.init(); Full.init();
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) UI.showTouch(true);
 UI.showMenu();
 { const room = new URLSearchParams(location.search).get('room'); if (room) { $('joinCode').value = room.toUpperCase().slice(0, 6); $('onlineBox').classList.add('invited'); } }
