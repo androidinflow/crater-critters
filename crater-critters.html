@@ -29,7 +29,8 @@
   .row{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
   .row>label{min-width:110px;font-weight:bold}
   .seg{display:inline-flex;border:3px solid var(--ink);border-radius:12px;overflow:hidden}
-  .seg button{border:0;border-right:2px solid var(--ink);border-radius:0;box-shadow:none;margin:0;padding:6px 14px;background:#fff}
+  .seg button{border:0;border-right:2px solid var(--ink);border-radius:0;box-shadow:none;margin:0;padding:6px 12px;background:#fff}
+  .seg{flex-wrap:nowrap}
   .seg button:last-child{border-right:0}
   .seg button.on{background:var(--accent2)}
   button{font:inherit;font-weight:bold;cursor:pointer;background:#fff;border:3px solid var(--ink);border-radius:12px;padding:7px 14px;
@@ -67,6 +68,9 @@
   .online .row>label{min-width:0}
   .online input{width:7.5em;text-transform:uppercase;letter-spacing:2px;font-weight:bold}
   .small{font-size:13px;opacity:.8}
+  #roster{list-style:none;padding:0;margin:6px 0;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  #roster li{border:2px solid var(--ink);border-radius:10px;padding:3px 9px;font-weight:bold;background:#fff}
+  #roster li.lost{opacity:.5;text-decoration:line-through}
   .code{font-size:46px;font-weight:bold;letter-spacing:8px;text-align:center;color:var(--accent);text-shadow:3px 3px 0 var(--ink);margin:6px 0}
   /* touch controls */
   #touch{position:fixed;inset:0;pointer-events:none;z-index:5}
@@ -134,6 +138,7 @@
     <p class="small center" id="mapNote" style="margin:-4px 0 8px">The backdrop previews your map &amp; theme.</p>
     <p class="small center hidden" id="iosTip">📱 iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
     <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
+    <div class="row"><label>Critters each</label><div class="seg" id="perTeam"></div><span class="small">2 each is roomier for big games</span></div>
     <div id="teamList"></div>
     <div class="grid2">
       <div class="row"><label>Turn time</label><select id="turnTime"><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option></select></div>
@@ -148,7 +153,7 @@
     </div>
     <div class="online" id="onlineBox">
       <h3>Play online with a friend</h3>
-      <div class="small" style="margin-bottom:6px">You play as the first team above (name &amp; colour). The host's map, scheme and timers are used.</div>
+      <div class="small" style="margin-bottom:6px">Up to 8 players, one per phone or computer. You play as the first team above (name &amp; colour); the host's map, scheme, critters-each and timers are used.</div>
       <div class="row"><button id="hostBtn">Host a game</button><span class="small">or join:</span>
         <input type="text" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters"><button id="joinBtn">Join</button></div>
     </div>
@@ -240,9 +245,11 @@ const CFG = {
   WATER0: 1120,
   GIRDER_RANGE: 260,
 };
-const TEAM_COLORS = ['#ff4d6d', '#3a86ff', '#ffbe0b', '#2ec4b6', '#9d4edd', '#fb5607'];
+const TEAM_COLORS = ['#ff4d6d', '#3a86ff', '#ffbe0b', '#2ec4b6', '#9d4edd', '#fb5607', '#8ac926', '#ff8fab'];
+const MAX_TEAMS = 8;
 const NAMES = ['Pip','Bramble','Nibs','Spud','Tuft','Prickle','Mochi','Waffles','Bean','Noodle','Biscuit','Sprout',
-  'Tater','Fizz','Pebble','Doodle','Gizmo','Puddle','Crumb','Bonk','Wobbles','Zest','Toffee','Squeak','Pogo','Nugget'];
+  'Tater','Fizz','Pebble','Doodle','Gizmo','Puddle','Crumb','Bonk','Wobbles','Zest','Toffee','Squeak','Pogo','Nugget',
+  'Pickle','Munch','Dizzy','Scoot','Fudge','Twig','Blip','Snug','Rascal','Pudding','Ziggy','Mellow','Scamp','Nibble'];
 const QUIPS = {
   hit: ['Ow, my quills!','Not the face!','Rude!','Right in the snoot!','Totally meant that.','My spines!','Who ordered THAT?',
     'Ouchie wawa!','I\'m too round for this!','Hey! I just got fluffed!','That tickled… NOT!','Mommy?!','Boing?!'],
@@ -1441,7 +1448,7 @@ function girderOk(c, x, y) {
   return true;
 }
 function selectWeapon(id) {
-  if (Net.role === 'guest') { Net.send({ t: 'w', id }); g.weapon = id; return; }
+  if (Net.role === 'guest') { Net.send({ t: 'w', id, pid: Net.pid, team: Net.myTeam }); g.weapon = id; return; }
   const team = g.active.team;
   if (g.fired || g.lockWeapon || !weaponUsable(team, id) && id !== 'skip') return;
   g.weapon = id; team.lastWeapon = id; g.charging = false; if (id !== 'bee') g.target = null;
@@ -1812,7 +1819,7 @@ function bindTouchButtons() {
 function myTurn() { return g.state === 'turn' && g.active && (!g.online || g.active.team.idx === Net.myTeam); }
 function worldClick(wx, wy) {
   if (g.state !== 'turn' || !g.controlling || g.ai || UI.blocking() || !myTurn()) return;
-  if (Net.role === 'guest') { Net.send({ t: 'ck', x: Math.round(wx), y: Math.round(wy) }); if (g.weapon === 'bee' && !g.retreat) g.target = { x: wx, y: wy }; return; }
+  if (Net.role === 'guest') { Net.send({ t: 'ck', x: Math.round(wx), y: Math.round(wy), pid: Net.pid, team: Net.myTeam }); if (g.weapon === 'bee' && !g.retreat) g.target = { x: wx, y: wy }; return; }
   applyClick(wx, wy);
 }
 function applyClick(wx, wy) {
@@ -2201,7 +2208,7 @@ const Mini = {
     if (!T && w < 720) return;
     if (!this.cvs) { this.cvs = document.createElement('canvas'); this.cvs.width = 240; this.cvs.height = 120; }
     if (this.ver !== Terrain.version) { this.ver = Terrain.version; const x = this.cvs.getContext('2d'); x.clearRect(0, 0, 240, 120); x.drawImage(Terrain.cvs, 0, 0, CFG.W, CFG.H, 0, 0, 240, 120); }
-    const mw = T ? 140 : 192, mh = mw / 2, mx = w / 2 - mw / 2, my = T ? 12 : h - 14 - g.teams.length * 18 - mh - 10;
+    const rows = g.teams.length, mw = T ? 140 : 192, mh = mw / 2, mx = w / 2 - mw / 2, my = T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
     this.rect = { x: mx, y: my, w: mw, h: mh };
     ctx.save();
     rr(ctx, mx - 3, my - 3, mw + 6, mh + 6, 6); ctx.fillStyle = 'rgba(20,12,6,0.75)'; ctx.fill();
@@ -2300,14 +2307,14 @@ function drawHUD() {
   }
   // team totals
   {
-    const narrow = w < 820, rows = g.teams.length, rowH = 18;
+    const narrow = w < 820, rows = g.teams.length, rowH = rows > 4 ? (T ? 12 : 14) : 18;
     const bw = T ? Math.min(300, Math.max(200, w * 0.45)) : Math.min(360, w - 130), x0 = T ? 14 - 118 : w / 2 - bw / 2;
     const y0 = T ? L.wy + 46 : h - (narrow ? 64 : 14) - rows * rowH;
     if (bw > 120) for (let i = 0; i < rows; i++) {
       const t = g.teams[i], tot = t.critters.reduce((s, c) => s + (c.alive ? Math.max(0, c.hp) : 0), 0), y = y0 + i * rowH;
-      const bar = clamp(tot / (CFG.HP * CFG.PER_TEAM), 0, 1.4) * (bw - 120);
+      const bar = clamp(tot / (CFG.HP * (g.perTeam || CFG.PER_TEAM)), 0, 1.4) * (bw - 120);
       if (T) txt(t.name, x0 + 118 + Math.max(4, bar) + 6, y + 8, 11, shade(t.color, 0.2), 'left', 3); else txt(t.name, x0 + 112, y + 8, 12, shade(t.color, 0.2), 'right', 3);
-      rr(ctx, x0 + 118, y + 2, Math.max(4, bar), 13, 5); ctx.fillStyle = t.color; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.stroke();
+      rr(ctx, x0 + 118, y + 2, Math.max(4, bar), rowH - 5, 5); ctx.fillStyle = t.color; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.stroke();
       if (g.state === 'turn' && team === t && !T) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x0 + 116 + bar + 10, y + 8); ctx.lineTo(x0 + 116 + bar + 18, y + 3); ctx.lineTo(x0 + 116 + bar + 18, y + 13); ctx.fill(); }
     }
   }
@@ -2320,7 +2327,7 @@ function drawHUD() {
     const mine = team.idx === Net.myTeam, pulse = mine ? 0.75 + 0.25 * Math.sin(g.time * 5) : 0.8;
     ctx.globalAlpha = pulse; txt(mine ? 'YOUR TURN' : `${team.name} is playing…`, w / 2, L.bannerY + (T || w >= 700 ? 30 : 76), 15, mine ? team.color : '#fff'); ctx.globalAlpha = 1;
   }
-  if (Net.role && Net.peerLost) txt(Net.role === 'host' ? 'Friend disconnected' : 'Host disconnected', w / 2, h * 0.5, 22, '#ff4d6d');
+  if (Net.role === 'guest' && Net.hostLost) txt('Host disconnected…', w / 2, h * 0.5, 22, '#ff4d6d');
   if (g.online && Net.code) { // room code, so a friend can still join / rejoin mid-game
     const ry = T ? (Mini.rect ? Mini.rect.y + Mini.rect.h + 12 : 20) : 14;
     ctx.globalAlpha = 0.9; txt(`Room ${Net.code}`, w / 2, ry, T ? 12 : 13, '#ffd23f', 'center', 3); ctx.globalAlpha = 1;
@@ -2333,9 +2340,11 @@ function drawHUD() {
 
 const $ = id => document.getElementById(id);
 const DEFAULT_SETTINGS = {
-  numTeams: 2, turnTime: 45, sdMinutes: 10, map: 'Island', theme: 'Meadow', scheme: 'Classic',
+  numTeams: 2, perTeam: 4, turnTime: 45, sdMinutes: 10, map: 'Island', theme: 'Meadow', scheme: 'Classic',
   teams: [{ name: 'Spiky Bunch', color: 0, ai: false }, { name: 'Quill Squad', color: 1, ai: true },
-          { name: 'Bristle Brigade', color: 2, ai: true }, { name: 'Prickly Pals', color: 3, ai: true }],
+          { name: 'Bristle Brigade', color: 2, ai: true }, { name: 'Prickly Pals', color: 3, ai: true },
+          { name: 'Thistle Troop', color: 4, ai: true }, { name: 'Burr Buddies', color: 5, ai: true },
+          { name: 'Needle Knights', color: 6, ai: true }, { name: 'Fuzz Force', color: 7, ai: true }],
 };
 const SETTINGS_KEY = 'craterCritters.settings.v1';
 function loadSettings() {
@@ -2354,8 +2363,11 @@ const UI = {
   blocking() { return this.pickerOpen || this.paused || this.helpOpen; },
   buildMenu() {
     const seg = $('numTeams'); seg.innerHTML = '';
-    for (let n = 2; n <= 4; n++) { const b = document.createElement('button'); b.textContent = n; b.className = settings.numTeams === n ? 'on' : '';
-      b.onclick = () => { settings.numTeams = n; saveSettings(); this.buildMenu(); }; seg.appendChild(b); }
+    for (let n = 2; n <= MAX_TEAMS; n++) { const b = document.createElement('button'); b.textContent = n; b.className = settings.numTeams === n ? 'on' : '';
+      b.onclick = () => { if (n > 4 && settings.numTeams <= 4 && settings.perTeam === 4) settings.perTeam = 2; settings.numTeams = n; saveSettings(); this.buildMenu(); }; seg.appendChild(b); }
+    const pseg = $('perTeam'); pseg.innerHTML = '';
+    for (let n = 1; n <= 4; n++) { const b = document.createElement('button'); b.textContent = n; b.className = settings.perTeam === n ? 'on' : '';
+      b.onclick = () => { settings.perTeam = n; saveSettings(); this.buildMenu(); }; pseg.appendChild(b); }
     const list = $('teamList'); list.innerHTML = '';
     for (let i = 0; i < settings.numTeams; i++) {
       const t = settings.teams[i], row = document.createElement('div'); row.className = 'team';
@@ -2372,7 +2384,7 @@ const UI = {
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('scheme', 'scheme');
     bindSel('mapStyle', 'map', false, startBackdrop); bindSel('theme', 'theme', false, startBackdrop);
   },
-  showMenu() { if (Net.role) { Net.send({ t: 'bye' }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
+  showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
   hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
@@ -2424,8 +2436,8 @@ $('pauseHelpBtn').onclick = () => UI.toggleHelp();
 $('quitBtn').onclick = () => UI.showMenu();
 $('rematchBtn').onclick = () => {
   UI.hideAll();
-  if (Net.role === 'guest') { Net.send({ t: 'rm' }); UI.lobby('Rematch!', 'Waiting for your friend to start the rematch…'); }
-  else if (Net.role === 'host') Net.startGame(Net.guestInfo);
+  if (Net.role === 'guest') { Net.send({ t: 'rm', pid: Net.pid }); UI.lobby('Rematch!', 'Waiting for the host to start the rematch…'); }
+  else if (Net.role === 'host') Net.startGame();
   else newGame();
 };
 $('hostBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); Net.host(); };
@@ -2479,14 +2491,14 @@ function takeSpot(spots, used, minD) {
 }
 // cfg (online only): { teams: [{ name, color, ai }] } overrides the menu's team list
 function newGame(cfg) {
-  g = makeState(); g.online = !!cfg; Net.log = []; Net.events = [];
+  g = makeState(); g.online = !!cfg; Net.log = []; Net.events = []; g.perTeam = settings.perTeam || 4;
   const s = settings, sc = SCHEMES[s.scheme] || SCHEMES.Classic, seed = Math.random() * 1e9 | 0;
   g.scheme = sc; g.seed = seed; g.mapStyle = resolveMap(s.map); g.theme = resolveTheme(s.theme);
   Terrain.generate(g.mapStyle, seed, g.theme); bg = makeBackground(seed, Terrain.cavern);
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
   g.teams = (cfg ? cfg.teams : settings.teams.slice(0, s.numTeams)).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0 }));
   const spots = surfaceSpots(), used = [];
-  for (const t of g.teams) for (let k = 0; k < CFG.PER_TEAM; k++) {
+  for (const t of g.teams) for (let k = 0; k < g.perTeam; k++) {
     const c = new Critter(t, names.pop() || 'Critter'), sp = takeSpot(spots, used, 70);
     c.x = sp.x; c.y = sp.y - 18; c.fallDmg = false; c.id = ++g.nextId; t.critters.push(c); g.critters.push(c); g.ents.push(c);
   }
@@ -2542,7 +2554,11 @@ function startTurn() {
   g.weapon = weaponUsable(team, team.lastWeapon) ? team.lastWeapon : (WEAPONS.find(w => !w.util && weaponUsable(team, w.id)) || WEAP.skip).id;
   g.fuse = team.fuse;
   g.ai = team.ai ? new AIBrain(c) : null;
-  Net.fpSeen = Net.remote.fp | 0; Net.jpSeen = Net.remote.jp | 0;
+  if (g.online && Net.role === 'host' && team.idx !== 0) {
+    const peer = Net.peerOf(team.idx), R = Net.remotes[team.idx] || {};
+    Net.seen = { fp: R.fp | 0, jp: R.jp | 0 };
+    if (!peer || peer.lost) { g.ai = new AIBrain(c); g.ai.standIn = true; banner(`${team.name} is away – the AI plays for them`, team.color); }
+  }
   cam.manualT = 0;
   if (g.online) { Net.mute++; turnBanner(); Net.mute--; } else
   banner(`${team.name} — ${c.name}`, team.color);
@@ -2624,8 +2640,9 @@ function updateTurn(dt) {
   const c = g.active;
   if (!c || !c.alive || teamsAlive().length <= 1) { endControl(); return; }
   let inp;
+  if (g.ai && g.ai.standIn && !g.fired) { const peer = Net.peerOf(c.team.idx); if (peer && !peer.lost) { g.ai = null; banner(`${c.team.name} is back – your turn!`, c.team.color); } }
   if (g.ai) inp = g.ai.update(dt);
-  else if (g.online && c.team.idx !== Net.myTeam) inp = Net.remoteInput();
+  else if (g.online && c.team.idx !== Net.myTeam) inp = Net.remoteInput(c.team.idx);
   else {
     inp = UI.blocking() ? blankInput() : humanInput();
     if (!UI.blocking()) for (let k = 1; k <= 5; k++) if (Input.pressed.has('Digit' + k) || Input.pressed.has('Numpad' + k)) { g.fuse = k; c.team.fuse = k; banner(`Fuse: ${k} second${k > 1 ? 's' : ''}`); Sfx.tick(); }
@@ -2766,9 +2783,9 @@ function netCopy(v) {
   return v;
 }
 const Net = {
-  role: null, ws: null, code: '', topic: '', ref: 1, joined: false, timers: [], started: false,
-  myTeam: 0, events: [], log: [], mute: 0, remote: { fp: 0, jp: 0 }, fpSeen: 0, jpSeen: 0,
-  fp: 0, jp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastPeer: 0, peerLost: false, snapAt: 0, guestInfo: null, helloT: 0,
+  role: null, ws: null, code: '', topic: '', ref: 1, joined: false, started: false, accepted: false,
+  pid: '', myTeam: 0, peers: {}, remotes: {}, seen: { fp: 0, jp: 0 }, events: [], log: [], mute: 0,
+  fp: 0, jp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, snapAt: 0, helloT: 0, roster: [],
   // ---- transport ----
   open() {
     const ws = this.ws = new WebSocket(`${SUPA.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SUPA.key}&vsn=1.0.0`);
@@ -2778,7 +2795,7 @@ const Net = {
       let m; try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.topic !== this.topic) return;
       if (m.event === 'phx_reply' && !this.joined) { if (m.payload && m.payload.status === 'ok') { this.joined = true; this.onJoined(); } else UI.netStatus('Could not join the room.'); }
-      else if (m.event === 'broadcast' && m.payload) { this.lastPeer = performance.now(); this.onMsg(m.payload.payload || {}); }
+      else if (m.event === 'broadcast' && m.payload) this.onMsg(m.payload.payload || {});
     };
     ws.onclose = () => {
       if (this.ws !== ws || !this.role) return;
@@ -2791,89 +2808,130 @@ const Net = {
   send(msg) { if (this.joined) this.push('broadcast', { type: 'broadcast', event: 'm', payload: msg }); },
   begin(code, role) {
     this.leave();
-    Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, peerLost: false, lastPeer: performance.now(),
-      events: [], remote: { fp: 0, jp: 0 }, fpSeen: 0, jpSeen: 0, fp: 0, jp: 0, lastIn: '', myTeam: role === 'host' ? 0 : 1 });
+    Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, accepted: false, hostLost: false, lastHost: performance.now(),
+      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0 }, fp: 0, jp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [],
+      pid: this.pid || Math.random().toString(36).slice(2, 10) });
+    // heartbeat on a timer (not the animation loop) so a backgrounded phone tab still counts as present
+    this.hbTimer = setInterval(() => { if (this.joined) this.send(this.role === 'host' ? { t: 'hb', host: 1 } : { t: 'hb', pid: this.pid, team: this.myTeam }); }, 2000);
     this.open();
   },
-  leave() { const ws = this.ws; this.ws = null; this.role = null; this.joined = false; this.started = false; if (ws) try { ws.close(); } catch (e) { } },
+  leave() { clearInterval(this.hbTimer); const ws = this.ws; this.ws = null; this.role = null; this.joined = false; this.started = false; if (ws) try { ws.close(); } catch (e) { } },
+  peerOf(team) { for (const k in this.peers) if (this.peers[k].team === team) return this.peers[k]; return null; },
+  peerList() { return Object.values(this.peers).sort((a, b) => a.team - b.team); },
   // ---- lobby ----
   host() {
     const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code = ''; for (let i = 0; i < 5; i++) code += A[Math.random() * A.length | 0];
     this.begin(code, 'host');
     const link = `${location.origin}${location.pathname}?room=${code}`;
     UI.hideAll();
-    UI.lobby('Hosting online game', `<p>Send this code to your friend:</p><div class="code">${code}</div>
-      <p class="center"><button id="copyBtn">Copy invite link</button></p><p class="small center" id="netStatus">Connecting…</p>`);
+    UI.lobby('Hosting online game', `<p class="center">Send this code to your friends (up to 7 can join):</p><div class="code">${code}</div>
+      <p class="center"><button id="copyBtn">Copy invite link</button></p><ul id="roster"></ul>
+      <p class="center"><button id="startOnline" class="big" disabled>Start game</button></p><p class="small center" id="netStatus">Connecting…</p>`);
     $('copyBtn').onclick = () => { navigator.clipboard?.writeText(link).then(() => { $('copyBtn').textContent = 'Link copied!'; }, () => prompt('Copy this link:', link)); };
+    $('startOnline').onclick = () => { if (this.peerList().length) this.startGame(); };
+    this.renderRoster();
   },
   join(code) {
     this.begin(code, 'guest');
     UI.hideAll();
-    UI.lobby('Joining game', `<div class="code">${code}</div><p class="small center" id="netStatus">Connecting…</p>`);
+    UI.lobby('Joining game', `<div class="code">${code}</div><ul id="roster"></ul><p class="small center" id="netStatus">Connecting…</p>`);
   },
   onJoined() {
-    if (this.role === 'host') UI.netStatus(this.started ? 'Reconnected.' : 'Waiting for your friend to join…');
-    else { UI.netStatus(this.started ? 'Reconnected – syncing…' : 'Looking for the host…'); this.hello(); }
+    if (this.role === 'host') UI.netStatus(this.started ? 'Reconnected.' : 'Waiting for friends to join…');
+    else { this.accepted = false; UI.netStatus(this.started ? 'Reconnected – syncing…' : 'Looking for the host…'); this.hello(); }
   },
-  hello() { const t = settings.teams[0]; this.send({ t: 'hello', name: t.name, color: t.color }); this.helloT = 0; },
-  startGame(info) {           // host: build the match and hand the guest everything it needs
-    this.guestInfo = info; this.started = true;
-    const me = settings.teams[0]; let gc = info.color | 0; if (gc === me.color) gc = (me.color + 1) % TEAM_COLORS.length;
+  hello() { const t = settings.teams[0]; this.send({ t: 'hello', pid: this.pid, name: String(t.name || 'Friend').slice(0, 18), color: t.color | 0 }); this.helloT = 0; },
+  renderRoster() {
+    const ul = $('roster'); if (!ul) return; ul.innerHTML = '';
+    const list = this.role === 'host' ? [{ name: settings.teams[0].name, color: settings.teams[0].color, host: true }, ...this.peerList()] : this.roster;
+    for (const p of list) { const li = document.createElement('li'); li.textContent = (p.host ? '👑 ' : '') + p.name; li.style.color = TEAM_COLORS[p.color | 0]; if (p.lost) li.className = 'lost'; ul.appendChild(li); }
+    const b = $('startOnline'); if (b) { const n = this.peerList().length; b.disabled = !n; b.textContent = n ? `Start game (${n + 1} players)` : 'Start game'; }
+  },
+  broadcastRoster() {
+    this.roster = [{ name: settings.teams[0].name, color: settings.teams[0].color, host: true }, ...this.peerList().map(p => ({ name: p.name, color: p.color, lost: p.lost }))];
+    this.send({ t: 'roster', host: 1, list: this.roster, started: this.started });
+    this.renderRoster();
+  },
+  startGame() {              // host: build the match for everyone in the room and hand them the world
+    this.started = true;
+    const me = settings.teams[0], used = new Set(), teams = [];
+    const takeColor = c => { c = c | 0; for (let k = 0; k < TEAM_COLORS.length && used.has(c); k++) c = (c + 1) % TEAM_COLORS.length; used.add(c); return c; };
+    teams.push({ name: me.name, color: takeColor(me.color), ai: false });
+    for (const p of this.peerList()) teams.push({ name: p.name, color: takeColor(p.color), ai: false });
     UI.hideAll();
-    newGame({ teams: [{ name: me.name, color: me.color, ai: false }, { name: String(info.name || 'Friend').slice(0, 18), color: gc, ai: false }] });
+    newGame({ teams });
     this.sendInit();
   },
-  sendInit() {
-    this.send({ t: 'init', seed: g.seed, map: g.mapStyle, theme: g.theme, turnTime: settings.turnTime, sdMinutes: settings.sdMinutes,
+  sendInit(to) {
+    const slots = {}; for (const k in this.peers) slots[k] = this.peers[k].team;
+    this.send({ t: 'init', host: 1, to, slots, seed: g.seed, map: g.mapStyle, theme: g.theme, perTeam: g.perTeam, turnTime: settings.turnTime, sdMinutes: settings.sdMinutes,
       teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
   },
   onMsg(m) {
-    if (m.t === 'chat') { Chat.add(String(m.n || 'Friend').slice(0, 18), m.c, String(m.x || '').slice(0, 120), false); return; }
-    if (m.t === 'bye') { UI.netStatus('Your friend left the game.'); this.peerLost = true; return; }
+    const now = performance.now();
     if (this.role === 'host') {
+      const peer = m.pid ? this.peers[m.pid] : null;
+      if (peer) { peer.last = now; if (peer.lost && m.t !== 'bye') { peer.lost = false; banner(`${peer.name} is back!`, '#8ecae6'); this.broadcastRoster(); } }
       switch (m.t) {
-        case 'hello': if (!this.started || g.state === 'menu') this.startGame(m); else { this.sendInit(); banner('Your friend (re)joined!', '#8ecae6'); } this.peerLost = false; break;
-        case 'in': this.remote = m; break;
-        case 'w': if (this.guestControls()) selectWeapon(m.id); break;
-        case 'fz': if (this.guestControls() && m.k >= 1 && m.k <= 5) { g.fuse = m.k; g.active.team.fuse = m.k; banner(`Fuse: ${m.k}s`); } break;
-        case 'ck': if (this.guestControls()) applyClick(+m.x, +m.y); break;
-        case 'rm': if (g.state === 'gameover') this.startGame(this.guestInfo); break;
+        case 'hello':
+          if (peer) { if (this.started && g.state !== 'menu') this.sendInit(m.pid); else this.broadcastRoster(); }
+          else if (this.started || this.peerList().length >= MAX_TEAMS - 1) this.send({ t: 'full', host: 1, to: m.pid });
+          else { this.peers[m.pid] = { pid: m.pid, team: this.peerList().length + 1, name: String(m.name || 'Friend').slice(0, 18), color: m.color | 0, last: now, lost: false };
+            UI.netStatus(`${this.peers[m.pid].name} joined!`); Sfx.pickup(); this.broadcastRoster(); }
+          break;
+        case 'in': if (peer && peer.team === m.team) this.remotes[m.team] = m; break;
+        case 'w': if (this.guestControls(m)) selectWeapon(m.id); break;
+        case 'fz': if (this.guestControls(m) && m.k >= 1 && m.k <= 5) { g.fuse = m.k; g.active.team.fuse = m.k; banner(`Fuse: ${m.k}s`); } break;
+        case 'ck': if (this.guestControls(m)) applyClick(+m.x, +m.y); break;
+        case 'rm': if (peer && g.state === 'gameover') this.startGame(); break;
+        case 'bye': if (peer) { peer.lost = true; banner(`${peer.name} left the game`, '#8ecae6'); this.broadcastRoster(); } break;
+        case 'chat': if (peer) Chat.add(peer.name, TEAM_COLORS[peer.color], String(m.x || '').slice(0, 120), false); break;
       }
     } else {
-      if (m.t === 'init') this.setupGuest(m);
-      else if (m.t === 's' && this.started) { applyEvents(m.ev); applySnap(m); }
+      if (m.host) { this.lastHost = now; if (this.hostLost) { this.hostLost = false; UI.netStatus('Host is back!'); } }
+      switch (m.t) {
+        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.setupGuest(m); break;
+        case 'roster': this.accepted = true; this.roster = m.list || []; this.renderRoster(); if (!this.started) UI.netStatus(`Joined! ${this.roster.length} in the room – waiting for the host to start…`); break;
+        case 'full': if (m.to === this.pid) { this.accepted = true; UI.netStatus('That room is full or already playing.'); } break;
+        case 's': if (this.started) { applyEvents(m.ev); applySnap(m); } break;
+        case 'chat': if (m.host || m.pid !== this.pid) Chat.add(String(m.n || 'Friend').slice(0, 18), m.c, String(m.x || '').slice(0, 120), false); break;
+        case 'bye': if (m.host) { this.hostLost = true; UI.netStatus('The host left the game.'); } break;
+      }
     }
   },
-  guestControls() { return g.state === 'turn' && g.controlling && g.active && g.active.team.idx !== this.myTeam; },
-  remoteInput() {             // host: turn the guest's latest input packet into one tick of input
-    const R = this.remote, inp = blankInput();
-    if (!this.peerLost) { inp.left = !!R.l; inp.right = !!R.r; inp.up = !!R.u; inp.down = !!R.d; inp.fireHeld = !!R.fh; }
-    if ((R.fp | 0) > this.fpSeen) { this.fpSeen++; inp.firePress = true; }
-    if ((R.jp | 0) > this.jpSeen) { this.jpSeen++; inp.jumpPress = true; }
+  guestControls(m) { const peer = this.peers[m.pid]; return !!peer && g.state === 'turn' && g.controlling && g.active && g.active.team.idx === m.team && peer.team === m.team; },
+  remoteInput(team) {        // host: turn that player's latest input packet into one tick of input
+    const R = this.remotes[team] || {}, peer = this.peerOf(team), inp = blankInput();
+    if (peer && !peer.lost) { inp.left = !!R.l; inp.right = !!R.r; inp.up = !!R.u; inp.down = !!R.d; inp.fireHeld = !!R.fh; }
+    if ((R.fp | 0) > this.seen.fp) { this.seen.fp++; inp.firePress = true; }
+    if ((R.jp | 0) > this.seen.jp) { this.seen.jp++; inp.jumpPress = true; }
     return inp;
   },
   ev(code, args) { if (this.role === 'host' && !this.mute) this.events.push([code, ...netCopy(args)]); },
   // ---- per-frame ----
   update(real) {
     if (!this.role || !this.joined) return;
-    if ((this.hbT += real) > 2) { this.hbT = 0; this.send({ t: 'hb' }); }
-    if (this.started && !this.peerLost && performance.now() - this.lastPeer > 9000) { this.peerLost = true; UI.netStatus(this.role === 'host' ? 'Your friend seems to have disconnected…' : 'Lost contact with the host…'); }
+    const now = performance.now();
     if (this.role === 'host') {
-      if (this.started && g.state !== 'menu' && ((this.snapT += real) > 1 / 15 || this.events.length > 250)) { this.snapT = 0; const s = this.snap(); s.ev = this.events; this.events = []; this.send(s); }
-    } else if (!this.started) { if ((this.helloT += real) > 1.5) this.hello(); }
-    else this.guestInput(real);
+      for (const k in this.peers) { const p = this.peers[k]; if (!p.lost && now - p.last > 12000) { p.lost = true; banner(`${p.name} seems to have disconnected…`, '#8ecae6'); this.broadcastRoster(); } }
+      if (this.started && g.state !== 'menu' && ((this.snapT += real) > 1 / 15 || this.events.length > 250)) { this.snapT = 0; const s = this.snap(); s.host = 1; s.ev = this.events; this.events = []; this.send(s); }
+    } else {
+      if (this.started && !this.hostLost && now - this.lastHost > 12000) { this.hostLost = true; UI.netStatus('Lost contact with the host…'); }
+      if (!this.accepted) { if ((this.helloT += real) > 1.5) this.hello(); }
+      else if (this.started) this.guestInput(real);
+    }
   },
   guestInput(real) {
     const mine = myTurn() && g.controlling, d = Input.down, p = Input.pressed, blocked = UI.blocking() || !mine;
     if (!blocked) {
       if (p.has('Space')) this.fp++;
       if (p.has('Enter') || p.has('NumpadEnter')) this.jp++;
-      for (let k = 1; k <= 5; k++) if (p.has('Digit' + k) || p.has('Numpad' + k)) { this.send({ t: 'fz', k }); g.fuse = k; }
+      for (let k = 1; k <= 5; k++) if (p.has('Digit' + k) || p.has('Numpad' + k)) { this.send({ t: 'fz', k, pid: this.pid, team: this.myTeam }); g.fuse = k; }
     }
     const st = blocked ? { l: 0, r: 0, u: 0, d: 0, fh: 0 } : { l: +!!(d.ArrowLeft || d.KeyA), r: +!!(d.ArrowRight || d.KeyD), u: +!!(d.ArrowUp || d.KeyW), d: +!!(d.ArrowDown || d.KeyS), fh: +!!d.Space };
-    st.fp = this.fp; st.jp = this.jp; st.t = 'in';
+    st.fp = this.fp; st.jp = this.jp; st.t = 'in'; st.pid = this.pid; st.team = this.myTeam;
     const key = JSON.stringify(st);
-    if (key !== this.lastIn || (this.inT += real) > 0.3) { this.send(st); this.lastIn = key; this.inT = 0; }
+    if (mine && (key !== this.lastIn || (this.inT += real) > 0.3)) { this.send(st); this.lastIn = key; this.inT = 0; }
     p.clear(); Input.released.clear();
   },
   // ---- snapshots ----
@@ -2888,14 +2946,14 @@ const Net = {
         return [k.code, e.id, nr(e.x), nr(e.y), nr(e.vx || 0), nr(e.vy || 0), ...k.f.map(f => nr(e[f]))]; }).filter(Boolean) };
   },
   setupGuest(m) {
-    UI.hideAll(); this.started = true; this.peerLost = false;
-    g = makeState(); g.online = true; g.seed = m.seed; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
+    UI.hideAll(); this.started = true; this.hostLost = false; this.myTeam = m.slots[this.pid];
+    g = makeState(); g.online = true; g.seed = m.seed; g.perTeam = m.perTeam || 4; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
     Terrain.generate(m.map, m.seed, m.theme); bg = makeBackground(m.seed, Terrain.cavern);
     applyEvents(m.log);
     g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0 }));
     applySnap(m.snap);
     cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
-    banner(`Joined ${m.teams[0].name}'s game!`, m.teams[1].color);
+    banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };
 const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust'];
@@ -3008,7 +3066,7 @@ const Chat = {
   send(text) {
     text = text.trim().slice(0, 120); if (!text || !this.available()) return;
     const now = performance.now(); if (now - this.lastSend < 400) return; this.lastSend = now;
-    const me = this.me(); Net.send({ t: 'chat', n: me.n, c: me.c, x: text }); this.add(me.n, me.c, text, true);
+    const me = this.me(); Net.send(Net.role === 'host' ? { t: 'chat', host: 1, n: me.n, c: me.c, x: text } : { t: 'chat', pid: Net.pid, n: me.n, c: me.c, x: text }); this.add(me.n, me.c, text, true);
   },
   add(name, color, text, mine) {
     const log = $('chatLog'), d = document.createElement('div'), b = document.createElement('b');
