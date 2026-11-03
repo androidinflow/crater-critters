@@ -2,15 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1b2a4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Crater Critters</title>
 <style>
   :root{
     --ink:#2b1d12; --paper:#fff6e3; --accent:#ff7b39; --accent2:#ffd23f; --shadow:#2b1d12;
   }
-  html,body{margin:0;height:100%;overflow:hidden;background:#1b2a4a;
+  html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;background:#1b2a4a;
     font-family:"Trebuchet MS","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;color:var(--ink);user-select:none}
-  canvas#game{display:block;width:100vw;height:100vh;cursor:crosshair}
+  canvas#game{display:block;width:100vw;height:100vh;height:100dvh;cursor:crosshair;touch-action:none}
   .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,18,40,.45);z-index:10;padding:16px;box-sizing:border-box}
   .hidden{display:none!important}
   .panel{background:var(--paper);border:4px solid var(--ink);border-radius:22px;box-shadow:0 8px 0 var(--shadow),0 18px 40px rgba(0,0,0,.35);
@@ -49,11 +51,41 @@
   kbd{display:inline-block;background:#fff;border:2px solid var(--ink);border-radius:6px;padding:0 5px;font-size:13px;font-family:inherit;box-shadow:0 2px 0 var(--ink)}
   .center{text-align:center}
   #winText{font-size:42px;margin:6px 0;text-shadow:3px 3px 0 var(--ink)}
+  /* online box & lobby */
+  .online{margin-top:14px;padding:10px 12px;border:3px dashed var(--ink);border-radius:14px;background:rgba(58,134,255,.08)}
+  .online.invited{background:rgba(255,210,63,.35);border-style:solid}
+  .online h3{margin:0 0 6px;font-size:17px}
+  .online .row>label{min-width:0}
+  .online input{width:7.5em;text-transform:uppercase;letter-spacing:2px;font-weight:bold}
+  .small{font-size:13px;opacity:.8}
+  .code{font-size:46px;font-weight:bold;letter-spacing:8px;text-align:center;color:var(--accent);text-shadow:3px 3px 0 var(--ink);margin:6px 0}
+  /* touch controls */
+  #touch{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #touch button{pointer-events:auto;position:absolute;touch-action:none;user-select:none;-webkit-user-select:none;
+    width:58px;height:58px;padding:0;border-radius:50%;font-size:22px;line-height:1;background:rgba(255,246,227,.72);box-shadow:0 3px 0 rgba(43,29,18,.8)}
+  #touch button.on{background:var(--accent2);transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+  #touch .dpad{position:absolute;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:174px;height:174px}
+  #touch .dpad [data-k=ArrowUp]{left:58px;top:0} #touch .dpad [data-k=ArrowDown]{left:58px;top:116px}
+  #touch .dpad [data-k=ArrowLeft]{left:0;top:58px} #touch .dpad [data-k=ArrowRight]{left:116px;top:58px}
+  #touch .acts{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:170px;height:174px}
+  #touch .acts [data-k=Space]{right:0;bottom:6px;width:88px;height:88px;font-size:18px;background:rgba(255,123,57,.85);color:#fff;text-shadow:1px 1px 0 var(--ink)}
+  #touch .acts [data-k=Enter]{right:96px;bottom:0;font-size:13px}
+  #touch .acts #tWeap{right:96px;bottom:70px;font-size:12px}
+  #touch #tPause{right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));width:44px;height:44px;font-size:16px}
+  @media (max-height:420px){ #touch button{width:50px;height:50px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} }
   @media (max-width:640px){ .grid2{grid-template-columns:1fr} .help{columns:1} h1.logo{font-size:34px} }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+
+<!-- ===== Touch controls (shown on touch devices) ===== -->
+<div id="touch" class="hidden">
+  <div class="dpad"><button data-k="ArrowUp" aria-label="Aim up">▲</button><button data-k="ArrowLeft" aria-label="Walk left">◀</button>
+    <button data-k="ArrowRight" aria-label="Walk right">▶</button><button data-k="ArrowDown" aria-label="Aim down">▼</button></div>
+  <div class="acts"><button id="tWeap" aria-label="Weapons">ARMS</button><button data-k="Enter" aria-label="Jump">JUMP</button><button data-k="Space" aria-label="Fire">FIRE</button></div>
+  <button id="tPause" aria-label="Pause">❚❚</button>
+</div>
 
 <!-- ===== Main menu ===== -->
 <div id="menu" class="overlay">
@@ -73,7 +105,19 @@
       <button id="helpBtn">Controls</button>
       <button id="startBtn" class="big">Let's Rumble!</button>
     </div>
+    <div class="online" id="onlineBox">
+      <h3>Play online with a friend</h3>
+      <div class="small" style="margin-bottom:6px">You play as the first team above (name &amp; colour). The host's map, scheme and timers are used.</div>
+      <div class="row"><button id="hostBtn">Host a game</button><span class="small">or join:</span>
+        <input type="text" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters"><button id="joinBtn">Join</button></div>
+    </div>
   </div>
+</div>
+
+<!-- ===== Online lobby ===== -->
+<div id="lobby" class="overlay hidden">
+  <div class="panel" style="width:min(420px,92vw)"><h2 id="lobbyTitle">Online</h2><div id="lobbyBody"></div>
+    <div class="actions"><button id="lobbyCancel">Cancel</button></div></div>
 </div>
 
 <!-- ===== Weapon picker ===== -->
@@ -84,7 +128,7 @@
 
 <!-- ===== Pause ===== -->
 <div id="pause" class="overlay hidden">
-  <div class="panel center"><h2>Paused</h2>
+  <div class="panel center"><h2>Paused</h2><p id="pauseNote" class="small hidden">Online match – the game keeps running!</p>
     <div class="actions" style="flex-direction:column">
       <button id="resumeBtn">Resume</button><button id="pauseHelpBtn">Controls</button><button id="quitBtn">Quit to menu</button>
     </div></div>
@@ -107,6 +151,7 @@
       <div>Robot: <kbd>Space</kbd> again to detonate</div>
       <div>Drag mouse to pan · scroll to zoom</div>
       <div><kbd>Esc</kbd>/<kbd>P</kbd> pause · <kbd>H</kbd> help · <kbd>M</kbd> mute</div>
+      <div>Touch: D-pad walks &amp; aims, hold FIRE to charge, tap the map to target, drag to pan, pinch to zoom</div>
       <div>After firing you get 3 seconds to run away!</div>
       <div>Water and the map edges are instant doom.</div>
     </div>
@@ -261,7 +306,7 @@ const Sfx = {
     return true;
   },
   tone(f, dur, type = 'square', vol = 0.15, f2 = null, delay = 0) {
-    if (!this.ok()) return; const t = this.ac.currentTime + delay;
+    this._hit = true; if (!this.ok()) return; const t = this.ac.currentTime + delay;
     const o = this.ac.createOscillator(), gn = this.ac.createGain(); o.type = type;
     o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
     gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(vol, t + 0.012);
@@ -269,7 +314,7 @@ const Sfx = {
     o.connect(gn); gn.connect(this.out); o.start(t); o.stop(t + dur + 0.05);
   },
   noise(dur, vol = 0.3, freq = 1000, f2 = null, type = 'lowpass', q = 1, delay = 0) {
-    if (!this.ok()) return; const t = this.ac.currentTime + delay;
+    this._hit = true; if (!this.ok()) return; const t = this.ac.currentTime + delay;
     const s = this.ac.createBufferSource(); s.buffer = this.nb; s.loop = true;
     const fl = this.ac.createBiquadFilter(); fl.type = type; fl.Q.value = q;
     fl.frequency.setValueAtTime(freq, t); if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
@@ -553,6 +598,11 @@ function P(o) { if (g.parts.length < 2200) { o.t = 0; g.parts.push(o); } }
 function shake(a) { g.shake = Math.max(g.shake, a); }
 function addText(x, y, text, col = '#fff', size = 20, life = 1.6) { g.texts.push({ x, y, text, col, size, t: 0, life }); }
 function banner(text, col = '#fff') { g.banner = { text, col, t: 0 }; }
+// Online: each browser announces the turn from its own point of view (not networked)
+function turnBanner() { const c = g.active; if (c) banner(c.team.idx === Net.myTeam ? `Your turn, ${c.name}!` : `${c.team.name}'s turn…`, c.team.color); }
+function addTracer(x1, y1, x2, y2) { g.tracers.push({ x1, y1, x2, y2, t: 0 }); }
+// Run an entity's per-frame cosmetic emitter without networking it (the guest runs trails itself)
+function localFx(e) { Net.mute++; try { e.trail(); } finally { Net.mute--; } }
 
 function fxExplosion(x, y, R) {
   P({ kind: 'flash', x, y, r: R * 1.4, life: 0.12 });
@@ -677,7 +727,7 @@ class Critter extends Body {
       case 'rope': this.ropePhysics(dt); break;
       case 'jet': this.jetPhysics(dt); break;
     }
-    this.eyes(dt);
+    this.eyes(dt); localFx(this);
     if (this.y > g.waterY - 2) killCritter(this, 'water');
     else if (this.x < -40 || this.x > CFG.W + 40) killCritter(this, 'off');
   }
@@ -721,7 +771,6 @@ class Critter extends Body {
   jetPhysics(dt) {
     if (this.thrust && this.fuel > 0) {
       this.vy -= 1120 * dt; this.fuel -= dt;
-      if (Math.random() < 0.8) P({ kind: 'fire', x: this.x - this.facing * 6, y: this.y + 8, vx: rand(-20, 20), vy: rand(120, 220), g: 0, drag: 0.9, size: rand(3, 6), life: 0.25 });
       if (Sfx.ok('jet', 110)) Sfx.noise(0.12, 0.12, 900, 400);
     }
     this.vx += this.jetX * 460 * dt; this.vx *= 0.985; this.vy = Math.max(-330, this.vy);
@@ -733,6 +782,7 @@ class Critter extends Body {
       if (this.fuel <= 0) this.land(0);
     }
   }
+  trail() { if (this.mode === 'jet' && this.thrust && this.fuel > 0 && Math.random() < 0.8) P({ kind: 'fire', x: this.x - this.facing * 6, y: this.y + 8, vx: rand(-20, 20), vy: rand(120, 220), g: 0, drag: 0.9, size: rand(3, 6), life: 0.25 }); }
   // Googly eyes: pupils are damped springs pulled toward the look direction and
   // flung around by the body's own changes in velocity.
   eyes(dt) {
@@ -777,11 +827,12 @@ class Barrel extends Body {
   update(dt) {
     this.physics(dt);
     if (this.fuseT >= 0) {
-      if (Math.random() < 0.5) P({ kind: 'fire', x: this.x + rand(-5, 5), y: this.y - 8, vx: 0, vy: -60, g: 0, drag: 0.95, size: rand(3, 6), life: 0.3 });
+      localFx(this);
       if ((this.fuseT -= dt) <= 0) return this.boom();
     }
     this.checkBounds();
   }
+  trail() { if (this.fuseT >= 0 && Math.random() < 0.5) P({ kind: 'fire', x: this.x + rand(-5, 5), y: this.y - 8, vx: 0, vy: -60, g: 0, drag: 0.95, size: rand(3, 6), life: 0.3 }); }
   onBlast(f, nx, ny, dmg) { this.push(f, nx, ny, 250); this.hp -= dmg * f + 5; if (this.hp <= 0 && this.fuseT < 0) this.fuseT = rand(0.12, 0.35); }
   boom() {
     this.dead = true; explode(this.x, this.y, 55, 40);
@@ -842,8 +893,7 @@ class Proj extends Body {
     this.age += dt;
     const t = this.type;
     if (t === 'bee') this.steer(dt);
-    if (t === 'rocket' && Math.random() < 0.9) P({ kind: 'smoke', x: this.x, y: this.y, vx: rand(-10, 10), vy: rand(-20, 0), g: -10, drag: 0.97, size: rand(3, 5), life: 0.8 });
-    if ((t === 'dynamite' || t === 'bomb') && Math.random() < 0.5) P({ kind: 'spark', x: this.x, y: this.y - 5, vx: rand(-40, 40), vy: rand(-90, -20), g: 200, drag: 0.95, size: 1.5, life: 0.3 });
+    localFx(this);
     if (this.stuck) { // sticky mine glued to the terrain
       this.important = false;
       if (!circleHits(this.x, this.y, this.r + 2)) this.stuck = false;
@@ -865,6 +915,11 @@ class Proj extends Body {
     if (this.fuse && (this.fuseT -= dt) <= 0) return this.boom();
     this.spin += this.vx * dt * 0.06;
     this.checkBounds();
+  }
+  trail() {
+    const t = this.type;
+    if (t === 'rocket' && Math.random() < 0.9) P({ kind: 'smoke', x: this.x, y: this.y, vx: rand(-10, 10), vy: rand(-20, 0), g: -10, drag: 0.97, size: rand(3, 5), life: 0.8 });
+    if ((t === 'dynamite' || t === 'bomb') && Math.random() < 0.5) P({ kind: 'spark', x: this.x, y: this.y - 5, vx: rand(-40, 40), vy: rand(-90, -20), g: 200, drag: 0.95, size: 1.5, life: 0.3 });
   }
   steer(dt) {
     if (Sfx.ok()) Sfx.buzz();
@@ -900,7 +955,7 @@ class Lava extends Body {
       if ((this.meltT -= dt) <= 0 && this.melts < 4) { this.meltT = 0.4; this.melts++; Terrain.carve(this.x, this.y + 2, 5, true); this.stuck = false; Sfx.sizzle(); }
       else if (!circleHits(this.x, this.y + 2, this.r + 1)) this.stuck = false;
     }
-    if (Math.random() < 0.12) P({ kind: 'smoke', x: this.x, y: this.y - 3, vx: rand(-8, 8), vy: -30, g: 0, drag: 0.97, size: rand(2, 4), life: 0.7, col: '#555' });
+    localFx(this);
     for (const c of g.critters) if (c.alive && Math.hypot(c.x - this.x, c.y - this.y) < c.r + 5) {
       // damage over time: ~9 HP/s per blob touching you
       c.pending += 9 * dt; c.hurtT = 0.3;
@@ -912,6 +967,8 @@ class Lava extends Body {
     if (this.x < -50 || this.x > CFG.W + 50) this.dead = true;
   }
 }
+
+Lava.prototype.trail = function () { if (Math.random() < 0.12) P({ kind: 'smoke', x: this.x, y: this.y - 3, vx: rand(-8, 8), vy: -30, g: 0, drag: 0.97, size: rand(2, 4), life: 0.7, col: '#555' }); };
 
 class Volcano {
   constructor(x, y) { Object.assign(this, { x, y, r: 8, t: 0, emitted: 0, dead: false, important: true }); }
@@ -1028,7 +1085,7 @@ function aimVec(c) { return { x: Math.cos(c.aim) * c.facing, y: Math.sin(c.aim) 
 function hasAmmo(team, id) { const a = team.ammo[id] ?? 0; return a === -1 || a > 0; }
 function useAmmo(id) { const t = g.active && g.active.team; if (t && t.ammo[id] > 0) t.ammo[id]--; }
 function weaponUsable(team, id) { return hasAmmo(team, id) && !(WEAP[id].air && Terrain.cavern); }
-function spawn(e) { g.ents.push(e); return e; }
+function spawn(e) { e.id = ++g.nextId; g.ents.push(e); return e; }
 
 function afterFire() { g.fired = true; g.retreat = true; g.charging = false; g.turnT = Math.min(g.turnT, CFG.RETREAT); }
 
@@ -1116,7 +1173,7 @@ function shootScatter(c) {
     if (x < 0 || x > CFG.W || y > g.waterY) break;
   }
   if (!end) end = { x, y };
-  g.tracers.push({ x1: x0, y1: y0, x2: end.x, y2: end.y, t: 0 });
+  addTracer(x0, y0, end.x, end.y);
 }
 
 function kazoo(c) {
@@ -1145,6 +1202,12 @@ function girderOk(c, x, y) {
     if (Math.hypot(dx - u * ca, dy - u * sa) < o.r + 5) return false;
   }
   return true;
+}
+function selectWeapon(id) {
+  if (Net.role === 'guest') { Net.send({ t: 'w', id }); g.weapon = id; return; }
+  const team = g.active.team;
+  if (g.fired || g.lockWeapon || !weaponUsable(team, id) && id !== 'skip') return;
+  g.weapon = id; team.lastWeapon = id; g.charging = false; if (id !== 'bee') g.target = null;
 }
 function doClickAction(c, id, wx, wy) {
   if (!weaponUsable(c.team, id)) { banner(WEAP[id].air && Terrain.cavern ? 'No air-drops in a cavern!' : 'Out of ammo!'); return; }
@@ -1415,30 +1478,64 @@ function humanInput() {
 function screenToWorld(sx, sy) { return { x: (sx - view.w / 2) / cam.zoom + cam.x, y: (sy - view.h / 2) / cam.zoom + cam.y }; }
 function worldToScreen(x, y) { return { x: (x - cam.x) * cam.zoom + view.w / 2, y: (y - cam.y) * cam.zoom + view.h / 2 }; }
 
-function bindMouse(cv) {
+// Pointer input for mouse, pen and touch: one-finger/left-drag pans, a tap/click acts on the
+// world, two fingers pinch-zoom, right-click opens the weapon picker.
+function bindPointer(cv) {
+  const pts = new Map(); let pinch = null;
   cv.addEventListener('contextmenu', e => e.preventDefault());
-  cv.addEventListener('mousedown', e => {
+  cv.addEventListener('pointerdown', e => {
     Sfx.init();
-    if (e.button === 2) { UI.togglePicker(); return; }
-    if (e.button !== 0 && e.button !== 1) return;
-    Input.mdown = true; Input.drag = false; Input.sx = e.clientX; Input.sy = e.clientY;
-  });
-  window.addEventListener('mousemove', e => {
-    if (Input.mdown) {
-      const dx = e.clientX - Input.mx, dy = e.clientY - Input.my;
-      if (!Input.drag && Math.hypot(e.clientX - Input.sx, e.clientY - Input.sy) > 6) Input.drag = true;
-      if (Input.drag) { cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom; cam.manualT = 3; }
-    }
+    if (e.pointerType !== 'mouse') UI.showTouch(true);
+    if (e.pointerType === 'mouse' && e.button === 2) { UI.togglePicker(); return; }
+    if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { }
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
     Input.mx = e.clientX; Input.my = e.clientY;
+    if (pts.size === 2) { const [p1, p2] = [...pts.values()]; pinch = { d: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, z: cam.tz }; Input.drag = true; }
+    else if (pts.size === 1) Input.drag = false;
   });
-  window.addEventListener('mouseup', e => {
-    if (Input.mdown && !Input.drag && e.button === 0 && e.target === cv) { const w = screenToWorld(e.clientX, e.clientY); worldClick(w.x, w.y); }
-    Input.mdown = false; Input.drag = false;
+  window.addEventListener('pointermove', e => {
+    const p = pts.get(e.pointerId);
+    if (e.pointerType === 'mouse' || p) { Input.mx = e.clientX; Input.my = e.clientY; }
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (pts.size >= 2 && pinch) {
+      const [p1, p2] = [...pts.values()];
+      cam.tz = cam.zoom = clamp(pinch.z * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinch.d, 0.45, 2.2);
+      cam.x -= dx / 2 / cam.zoom; cam.y -= dy / 2 / cam.zoom; cam.manualT = 3;
+      return;
+    }
+    if (!Input.drag && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > (e.pointerType === 'mouse' ? 6 : 12)) Input.drag = true;
+    if (Input.drag) { cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom; cam.manualT = 3; }
   });
+  const up = e => {
+    const p = pts.get(e.pointerId); if (!p) return;
+    if (pts.size === 1 && !Input.drag && e.type === 'pointerup') { const w = screenToWorld(e.clientX, e.clientY); worldClick(w.x, w.y); }
+    pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) Input.drag = false;
+  };
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   cv.addEventListener('wheel', e => { e.preventDefault(); cam.tz = clamp(cam.tz * Math.exp(-e.deltaY * 0.0012), 0.45, 2.2); }, { passive: false });
 }
+// On-screen buttons feed the same key table as the keyboard
+function bindTouchButtons() {
+  for (const b of document.querySelectorAll('#touch [data-k]')) {
+    const k = b.dataset.k;
+    const on = e => { e.preventDefault(); Sfx.init(); try { b.setPointerCapture(e.pointerId); } catch (err) { } if (!Input.down[k]) Input.pressed.add(k); Input.down[k] = true; b.classList.add('on'); };
+    const off = e => { e.preventDefault(); if (Input.down[k]) Input.released.add(k); Input.down[k] = false; b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  $('tWeap').addEventListener('click', () => UI.togglePicker());
+  $('tPause').addEventListener('click', () => UI.togglePause());
+}
+// Is the critter being controlled right now driven by *this* browser?
+function myTurn() { return g.state === 'turn' && g.active && (!g.online || g.active.team.idx === Net.myTeam); }
 function worldClick(wx, wy) {
-  if (g.state !== 'turn' || !g.controlling || g.ai || UI.blocking()) return;
+  if (g.state !== 'turn' || !g.controlling || g.ai || UI.blocking() || !myTurn()) return;
+  if (Net.role === 'guest') { Net.send({ t: 'ck', x: Math.round(wx), y: Math.round(wy) }); if (g.weapon === 'bee' && !g.retreat) g.target = { x: wx, y: wy }; return; }
+  applyClick(wx, wy);
+}
+function applyClick(wx, wy) {
   const c = g.active, id = g.weapon;
   if (id === 'bee' && !g.retreat && !g.charging) { g.target = { x: wx, y: wy }; Sfx.tone(900, 0.08, 'square', 0.08, 1300); return; }
   if (WEAP[id].kind !== 'click' || g.retreat) return;
@@ -1685,7 +1782,7 @@ function drawTargets(x) {
     x.beginPath(); x.moveTo(g.target.x - s, g.target.y - s); x.lineTo(g.target.x + s, g.target.y + s); x.moveTo(g.target.x + s, g.target.y - s); x.lineTo(g.target.x - s, g.target.y + s); x.stroke();
     circ(x, g.target.x, g.target.y, s + 6); x.stroke();
   }
-  if (!g.controlling || g.retreat || g.ai || UI.blocking()) return;
+  if (!g.controlling || g.retreat || g.ai || UI.blocking() || !myTurn()) return;
   const m = screenToWorld(Input.mx, Input.my), id = g.weapon;
   if (id === 'pelican' || id === 'anvil') {
     x.setLineDash([8, 8]); x.strokeStyle = 'rgba(255,255,255,0.7)'; x.lineWidth = 2; x.beginPath(); x.moveTo(m.x, m.y - 400); x.lineTo(m.x, m.y + 400); x.stroke(); x.setLineDash([]);
@@ -1754,9 +1851,14 @@ function drawHUD() {
   ctx.globalAlpha = 1;
   if (g.state === 'placement') { txt('Critters incoming!', w / 2, 60, 30, '#ffd23f'); return; }
   const c = g.active, team = c && c.team;
+  // Layout: desktop puts timer/wind at the bottom corners; touch moves them up out of the thumbs' way
+  const T = UI.touch, ps = T && w < 760 ? 0.8 : 1;
+  const L = T ? { tx: w - 46, ty: 98, ts: 0.82, wx: 14, wy: 14 + 70 * ps + 22, ww: 170, bannerY: Math.max(44, h * 0.3) }
+              : { tx: 54, ty: h - 54, ts: 1, ww: 200, wx: w - 216, wy: h - 50, bannerY: 40 };
   // weapon panel
   if (team && g.state === 'turn') {
     const W = WEAP[g.weapon];
+    ctx.save(); ctx.translate(14, 14); ctx.scale(ps, ps); ctx.translate(-14, -14);
     panel(14, 14, 270, 70);
     ctx.save(); ctx.translate(48, 49); drawIcon(ctx, W.id, 40); ctx.restore();
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = '#2b1d12'; ctx.font = 'bold 16px "Trebuchet MS", sans-serif';
@@ -1767,11 +1869,14 @@ function drawHUD() {
     if (W.air && Terrain.cavern) hint = 'No air-drops in caverns!';
     if (g.robot) hint = 'Space: KABOOM!'; else if (g.shotsLeft === 1) hint = 'One more shot!';
     if (c.mode === 'rope') hint = '←→ swing · ↑↓ climb · Space let go'; if (c.mode === 'jet') hint = `↑ thrust · fuel ${Math.max(0, c.fuel).toFixed(1)}s`;
+    if (T) hint = hint.replace('Hold Space', 'Hold FIRE').replace('Space again', 'FIRE again').replace('Space:', 'FIRE:').replace('Click', 'Tap').replace('click', 'tap').replace('keys 1–5', 'tap map').replace(' (tap map)', '');
     ctx.font = '12px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#2b1d12'; ctx.fillText(hint, 82, 69);
+    ctx.restore();
   }
   // timer
   {
-    const tx = 54, ty = h - 54, col = team ? team.color : '#aaa';
+    ctx.save(); ctx.translate(L.tx, L.ty); ctx.scale(L.ts, L.ts);
+    const tx = 0, ty = 0, col = team ? team.color : '#aaa';
     circ(ctx, tx, ty, 38); ctx.fillStyle = 'rgba(255,246,227,0.92)'; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 3; ctx.stroke();
     if (g.state === 'turn') {
       const frac = clamp(g.turnT / (g.retreat ? CFG.RETREAT : g.settings.turnTime), 0, 1);
@@ -1780,12 +1885,13 @@ function drawHUD() {
       txt(v, tx, ty + 1, 28, g.turnT < 5 && (g.time * 4 | 0) % 2 ? '#ff4d6d' : (g.retreat ? '#ff7b39' : col));
       if (g.retreat) txt('RUN!', tx, ty - 50, 18, '#ff7b39');
     } else txt('…', tx, ty, 26, '#888');
-    if (g.sd) txt('SUDDEN DEATH', tx + 46, ty - 46, 14, '#ff4d6d', 'left');
+    if (g.sd) txt('SUDDEN DEATH', T ? tx : tx + 46, T ? ty + 52 : ty - 46, 14, '#ff4d6d', T ? 'center' : 'left');
     else if (g.settings.sdMinutes > 0) { const left = Math.max(0, g.settings.sdMinutes * 60 - g.time); txt(`${left / 60 | 0}:${String(left % 60 | 0).padStart(2, '0')}`, tx, ty + 52, 12, '#fff'); }
+    ctx.restore();
   }
   // wind meter
   {
-    const ww = 200, wx = w - ww - 16, wy = h - 50;
+    const ww = L.ww, wx = L.wx, wy = L.wy;
     panel(wx, wy, ww, 36);
     ctx.fillStyle = '#2b1d12'; ctx.font = 'bold 11px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.fillText('WIND', wx + ww / 2, wy - 8);
     const mid = wx + ww / 2, len = g.wind * (ww / 2 - 12);
@@ -1799,22 +1905,30 @@ function drawHUD() {
   }
   // team totals
   {
-    const narrow = w < 820, rows = g.teams.length, bw = Math.min(360, w - 130), x0 = w / 2 - bw / 2, rowH = 18, y0 = h - (narrow ? 64 : 14) - rows * rowH;
+    const narrow = w < 820, rows = g.teams.length, rowH = 18;
+    const bw = T ? Math.min(300, Math.max(200, w * 0.45)) : Math.min(360, w - 130), x0 = T ? 14 - 118 : w / 2 - bw / 2;
+    const y0 = T ? L.wy + 46 : h - (narrow ? 64 : 14) - rows * rowH;
     if (bw > 120) for (let i = 0; i < rows; i++) {
       const t = g.teams[i], tot = t.critters.reduce((s, c) => s + (c.alive ? Math.max(0, c.hp) : 0), 0), y = y0 + i * rowH;
       const bar = clamp(tot / (CFG.HP * CFG.PER_TEAM), 0, 1.4) * (bw - 120);
-      txt(t.name, x0 + 112, y + 8, 12, shade(t.color, 0.2), 'right', 3);
+      if (T) txt(t.name, x0 + 118 + Math.max(4, bar) + 6, y + 8, 11, shade(t.color, 0.2), 'left', 3); else txt(t.name, x0 + 112, y + 8, 12, shade(t.color, 0.2), 'right', 3);
       rr(ctx, x0 + 118, y + 2, Math.max(4, bar), 13, 5); ctx.fillStyle = t.color; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.stroke();
-      if (g.state === 'turn' && team === t) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x0 + 116 + bar + 10, y + 8); ctx.lineTo(x0 + 116 + bar + 18, y + 3); ctx.lineTo(x0 + 116 + bar + 18, y + 13); ctx.fill(); }
+      if (g.state === 'turn' && team === t && !T) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x0 + 116 + bar + 10, y + 8); ctx.lineTo(x0 + 116 + bar + 18, y + 3); ctx.lineTo(x0 + 116 + bar + 18, y + 13); ctx.fill(); }
     }
   }
   // banner
   if (g.banner) {
     const b = g.banner, a = clamp(Math.min(b.t * 5, (2.6 - b.t) * 3), 0, 1);
-    if (a > 0) { ctx.globalAlpha = a; txt(b.text, w / 2, 40 + (1 - a) * -20, 24, b.col, 'center', 5); ctx.globalAlpha = 1; }
+    if (a > 0) { ctx.globalAlpha = a; txt(b.text, w / 2, L.bannerY + (1 - a) * -20, w < 500 ? 19 : 24, b.col, 'center', 5); ctx.globalAlpha = 1; }
   }
+  if (g.online && g.state === 'turn' && team) {
+    const mine = team.idx === Net.myTeam, pulse = mine ? 0.75 + 0.25 * Math.sin(g.time * 5) : 0.8;
+    ctx.globalAlpha = pulse; txt(mine ? 'YOUR TURN' : `${team.name} is playing…`, w / 2, L.bannerY + (T || w >= 700 ? 30 : 76), 15, mine ? team.color : '#fff'); ctx.globalAlpha = 1;
+  }
+  if (Net.role && Net.peerLost) txt(Net.role === 'host' ? 'Friend disconnected' : 'Host disconnected', w / 2, h * 0.5, 22, '#ff4d6d');
+  if (T && h > w * 1.15) { ctx.globalAlpha = 0.7; txt('Tip: turn your phone sideways ↻', w / 2, h - 210, 13, '#fff', 'center', 3); ctx.globalAlpha = 1; }
   if (g.state === 'turn' && g.ai) txt(g.ai.st === 'think' ? 'Thinking…' : '', w / 2, 72, 14, '#fff');
-  ctx.globalAlpha = 0.55; txt('Tab: weapons · H: help · Esc: pause', w - 16, 16, 11, '#fff', 'right', 3); ctx.globalAlpha = 1;
+  if (!T) { ctx.globalAlpha = 0.55; txt('Tab: weapons · H: help · Esc: pause', w - 16, 16, 11, '#fff', 'right', 3); ctx.globalAlpha = 1; }
   if (g.slowmo > 0) { ctx.fillStyle = `rgba(0,0,0,${0.25 * Math.min(1, g.slowmo)})`; ctx.fillRect(0, 0, w, 50); ctx.fillRect(0, h - 50, w, 50); }
 }
 
@@ -1834,7 +1948,10 @@ function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringif
 let settings = loadSettings();
 
 const UI = {
-  pickerOpen: false, paused: false, helpOpen: false,
+  pickerOpen: false, paused: false, helpOpen: false, touch: false,
+  showTouch(on) { if (this.touch === on) return; this.touch = on; $('touch').classList.toggle('hidden', !on); document.body.classList.toggle('touchy', on); },
+  lobby(title, html, showCancel = true) { $('lobby').classList.remove('hidden'); $('lobbyTitle').textContent = title; $('lobbyBody').innerHTML = html; $('lobbyCancel').classList.toggle('hidden', !showCancel); },
+  netStatus(t) { const el = $('netStatus'); if (el) el.textContent = t; if (g && g.state !== 'menu' && t) banner(t, '#8ecae6'); },
   blocking() { return this.pickerOpen || this.paused || this.helpOpen; },
   buildMenu() {
     const seg = $('numTeams'); seg.innerHTML = '';
@@ -1855,12 +1972,12 @@ const UI = {
     const bindSel = (id, key, num) => { const el = $(id); el.value = String(settings[key]); el.onchange = () => { settings[key] = num ? +el.value : el.value; saveSettings(); }; };
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('mapStyle', 'map'); bindSel('scheme', 'scheme');
   },
-  showMenu() { this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
-  hideAll() { ['menu', 'picker', 'pause', 'help', 'over'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
+  showMenu() { if (Net.role) { Net.send({ t: 'bye' }); Net.leave(); } this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
+  hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
-    if (!(g.state === 'turn' && g.controlling && !g.ai && !g.fired && !g.lockWeapon && !this.paused)) return;
-    g.charging = false;
+    if (!(g.state === 'turn' && g.controlling && !g.ai && !g.fired && !g.lockWeapon && !this.paused && myTurn())) return;
+    if (Net.role !== 'guest') g.charging = false;
     const grid = $('pickGrid'); grid.innerHTML = ''; const team = g.active.team;
     for (const W of WEAPONS) {
       const b = document.createElement('button'); b.className = 'wbtn' + (g.weapon === W.id ? ' sel' : '');
@@ -1868,7 +1985,7 @@ const UI = {
       const a = team.ammo[W.id] ?? 0, lab = document.createElement('span'); lab.textContent = W.name;
       const am = document.createElement('span'); am.className = 'ammo'; am.textContent = a === -1 ? '∞' : a;
       b.append(cv, lab, am); b.disabled = !weaponUsable(team, W.id);
-      b.onclick = () => { g.weapon = W.id; team.lastWeapon = W.id; if (W.id !== 'bee') g.target = null; this.togglePicker(); Sfx.tone(700, 0.06, 'square', 0.06); };
+      b.onclick = () => { selectWeapon(W.id); this.togglePicker(); Sfx.tone(700, 0.06, 'square', 0.06); };
       grid.appendChild(b);
     }
     $('picker').classList.remove('hidden'); this.pickerOpen = true;
@@ -1878,6 +1995,7 @@ const UI = {
     if (this.helpOpen) { this.toggleHelp(); return; }
     if (this.pickerOpen) { this.togglePicker(); return; }
     this.paused = !this.paused; $('pause').classList.toggle('hidden', !this.paused);
+    $('pauseNote').classList.toggle('hidden', !g.online);
   },
   toggleHelp() { this.helpOpen = !this.helpOpen; $('help').classList.toggle('hidden', !this.helpOpen); },
   showOver() {
@@ -1893,7 +2011,16 @@ $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
 $('pauseHelpBtn').onclick = () => UI.toggleHelp();
 $('quitBtn').onclick = () => UI.showMenu();
-$('rematchBtn').onclick = () => { UI.hideAll(); newGame(); };
+$('rematchBtn').onclick = () => {
+  UI.hideAll();
+  if (Net.role === 'guest') { Net.send({ t: 'rm' }); UI.lobby('Rematch!', 'Waiting for your friend to start the rematch…'); }
+  else if (Net.role === 'host') Net.startGame(Net.guestInfo);
+  else newGame();
+};
+$('hostBtn').onclick = () => { Sfx.init(); saveSettings(); Net.host(); };
+$('joinBtn').onclick = () => { Sfx.init(); saveSettings(); const code = $('joinCode').value.trim().toUpperCase(); if (code.length < 4) { $('joinCode').focus(); return; } Net.join(code); };
+$('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinBtn').click(); });
+$('lobbyCancel').onclick = () => UI.showMenu();
 $('menuBtn').onclick = () => UI.showMenu();
 
 // little animated mascot line-up on the menu
@@ -1916,7 +2043,7 @@ function makeState() {
   return { state: 'menu', time: 0, ents: [], critters: [], teams: [], parts: [], texts: [], tracers: [], wind: 0, waterY: CFG.WATER0, waterTarget: CFG.WATER0,
     shake: 0, banner: null, active: null, teamIdx: -1, turnT: 0, fired: false, retreat: false, charging: false, power: 0, weapon: 'bomb', fuse: 3, target: null,
     robot: null, shotsLeft: 0, shotCD: 0, lockWeapon: false, girderAng: 0, focus: null, ai: null, controlling: false, phase: '', phaseT: 0, quietT: 0, resolveT: 0,
-    sd: false, slowmo: 0, timeScale: 1, minesLive: false, overT: -1, winner: null, turnStartT: 0, settings };
+    sd: false, slowmo: 0, timeScale: 1, minesLive: false, overT: -1, winner: null, turnStartT: 0, settings, nextId: 0, online: false, netFocus: null };
 }
 function startBackdrop() {
   g = makeState(); const seed = Math.random() * 1e9 | 0;
@@ -1939,17 +2066,18 @@ function takeSpot(spots, used, minD) {
   for (let i = 0; i < 300; i++) { const s = pick(spots); if (used.every(u => Math.hypot(u.x - s.x, u.y - s.y) > minD)) { used.push(s); return s; } }
   const s = pick(spots); used.push(s); return s;
 }
-function newGame() {
-  g = makeState();
+// cfg (online only): { teams: [{ name, color, ai }] } overrides the menu's team list
+function newGame(cfg) {
+  g = makeState(); g.online = !!cfg; Net.log = []; Net.events = [];
   const s = settings, sc = SCHEMES[s.scheme] || SCHEMES.Classic, seed = Math.random() * 1e9 | 0;
-  g.scheme = sc;
+  g.scheme = sc; g.seed = seed;
   Terrain.generate(s.map, seed); bg = makeBackground(seed, Terrain.cavern);
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
-  g.teams = settings.teams.slice(0, s.numTeams).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb' }));
+  g.teams = (cfg ? cfg.teams : settings.teams.slice(0, s.numTeams)).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb' }));
   const spots = surfaceSpots(), used = [];
   for (const t of g.teams) for (let k = 0; k < CFG.PER_TEAM; k++) {
     const c = new Critter(t, names.pop() || 'Critter'), sp = takeSpot(spots, used, 70);
-    c.x = sp.x; c.y = sp.y - 18; c.fallDmg = false; t.critters.push(c); g.critters.push(c); g.ents.push(c);
+    c.x = sp.x; c.y = sp.y - 18; c.fallDmg = false; c.id = ++g.nextId; t.critters.push(c); g.critters.push(c); g.ents.push(c);
   }
   for (let i = 0; i < sc.mines; i++) { const sp = takeSpot(spots, used, 45); spawn(new Mine(sp.x, sp.y + CFG.CR - 6, Math.random() < 0.2)); }
   for (let i = 0; i < sc.barrels; i++) { const sp = takeSpot(spots, used, 45); spawn(new Barrel(sp.x, sp.y)); }
@@ -1999,7 +2127,9 @@ function startTurn() {
   g.weapon = weaponUsable(team, team.lastWeapon) ? team.lastWeapon : (WEAPONS.find(w => !w.util && weaponUsable(team, w.id)) || WEAP.skip).id;
   g.fuse = team.fuse;
   g.ai = team.ai ? new AIBrain(c) : null;
+  Net.fpSeen = Net.remote.fp | 0; Net.jpSeen = Net.remote.jp | 0;
   cam.manualT = 0;
+  if (g.online) { Net.mute++; turnBanner(); Net.mute--; } else
   banner(`${team.name} — ${c.name}`, team.color);
   c.speak(pick(QUIPS.turn));
 }
@@ -2080,6 +2210,7 @@ function updateTurn(dt) {
   if (!c || !c.alive || teamsAlive().length <= 1) { endControl(); return; }
   let inp;
   if (g.ai) inp = g.ai.update(dt);
+  else if (g.online && c.team.idx !== Net.myTeam) inp = Net.remoteInput();
   else {
     inp = UI.blocking() ? blankInput() : humanInput();
     if (!UI.blocking()) for (let k = 1; k <= 5; k++) if (Input.pressed.has('Digit' + k) || Input.pressed.has('Numpad' + k)) { g.fuse = k; c.team.fuse = k; banner(`Fuse: ${k} second${k > 1 ? 's' : ''}`); Sfx.tick(); }
@@ -2129,7 +2260,7 @@ function updateCamera(dt) {
   if (g.state === 'menu') { cam.x = CFG.W / 2 + Math.sin(g.time * 0.08) * CFG.W * 0.3; cam.y = 640; }
   else {
     cam.manualT -= dt;
-    const t = camTarget();
+    const t = Net.role === 'guest' ? g.netFocus : camTarget();
     if (t && cam.manualT <= 0 && !Input.drag) { const k = Math.min(1, dt * 3.5); cam.x += (t.x - cam.x) * k; cam.y += (t.y - 40 - cam.y) * k; }
   }
   cam.zoom += (cam.tz - cam.zoom) * Math.min(1, dt * 8);
@@ -2154,7 +2285,11 @@ function tick(dt) {
       if (g.overT > 0 && (g.overT -= dt) <= 0) UI.showOver();
     }
   }
-  // particles
+  updateFx(dt);
+  Input.pressed.clear(); Input.released.clear();
+}
+// Purely cosmetic per-frame updates (particles, floating text, tracers, banner): run by host and guest alike
+function updateFx(dt) {
   const ps = g.parts;
   for (let i = ps.length - 1; i >= 0; i--) {
     const p = ps[i]; p.t += dt;
@@ -2168,29 +2303,273 @@ function tick(dt) {
   for (const t of g.texts) t.t += dt; g.texts = g.texts.filter(t => t.t < t.life);
   for (const t of g.tracers) t.t += dt; g.tracers = g.tracers.filter(t => t.t < 0.25);
   if (g.banner && (g.banner.t += dt) > 2.6) g.banner = null;
-  Input.pressed.clear(); Input.released.clear();
 }
 
 let last = performance.now(), acc = 0;
 function frame(now) {
   let real = Math.min(0.1, (now - last) / 1000); last = now;
   if (g.slowmo > 0) { g.slowmo -= real; g.timeScale = 0.25; } else g.timeScale = 1;
-  if (!UI.paused && !UI.helpOpen) {
+  if (Net.role === 'guest') { guestTick(real); updateCamera(real); }
+  else if (g.online || (!UI.paused && !UI.helpOpen)) {   // an online match never pauses: your friend is still playing
     acc += real * g.timeScale; let n = 0;
     while (acc >= CFG.DT && n < 5) { tick(CFG.DT); acc -= CFG.DT; n++; }
     if (n === 5) acc = 0;
     updateCamera(real);
   }
+  Net.update(real);
   render();
+  const inMenu = !$('menu').classList.contains('hidden') || !$('lobby').classList.contains('hidden');
+  if (inMenu !== UI.inMenu) { UI.inMenu = inMenu; $('touch').style.visibility = inMenu ? 'hidden' : ''; }
   if (!$('menu').classList.contains('hidden')) drawMascots(now / 1000);
   requestAnimationFrame(frame);
+}
+
+
+// ============================== NETWORK (online 2-player) ==============================
+// Two browsers talk through a Supabase Realtime broadcast channel (Phoenix protocol over a
+// plain WebSocket, so no client library is needed). The HOST runs the whole simulation.
+// The GUEST runs no physics at all: it sends its key/tap input during its own turns and
+// renders what the host streams back:
+//   • snapshots (~15 Hz): game state, every critter and every entity, positions + velocities
+//   • events: terrain edits (carve/girder) and cosmetic calls (explosion fx, particles,
+//     sounds, floating text, banners), recorded by wrapping those functions on the host.
+// Terrain edits are also kept in a log so a (re)joining guest can rebuild the map from the
+// seed + log instead of downloading a 2.9 MB bitmap.
+const SUPA = { url: 'https://sup.charsi.cc', key: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc5MzIzMjY2MCwiZXhwIjo0OTQ4OTA2MjYwLCJyb2xlIjoiYW5vbiJ9.QuWZFrs3ejJi2MpjmMo-QxQRijTSLPdw6R5qoAxZ3NM' };
+const nr = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
+function netCopy(v) {
+  if (typeof v === 'number') return nr(v);
+  if (v && typeof v === 'object') { const o = Array.isArray(v) ? [] : {}; for (const k in v) o[k] = netCopy(v[k]); return o; }
+  return v;
+}
+const Net = {
+  role: null, ws: null, code: '', topic: '', ref: 1, joined: false, timers: [], started: false,
+  myTeam: 0, events: [], log: [], mute: 0, remote: { fp: 0, jp: 0 }, fpSeen: 0, jpSeen: 0,
+  fp: 0, jp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastPeer: 0, peerLost: false, snapAt: 0, guestInfo: null, helloT: 0,
+  // ---- transport ----
+  open() {
+    const ws = this.ws = new WebSocket(`${SUPA.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SUPA.key}&vsn=1.0.0`);
+    this.joined = false;
+    ws.onopen = () => this.push('phx_join', { config: { broadcast: { self: false, ack: false }, presence: { key: '' } }, access_token: SUPA.key });
+    ws.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (m.topic !== this.topic) return;
+      if (m.event === 'phx_reply' && !this.joined) { if (m.payload && m.payload.status === 'ok') { this.joined = true; this.onJoined(); } else UI.netStatus('Could not join the room.'); }
+      else if (m.event === 'broadcast' && m.payload) { this.lastPeer = performance.now(); this.onMsg(m.payload.payload || {}); }
+    };
+    ws.onclose = () => {
+      if (this.ws !== ws || !this.role) return;
+      this.joined = false; UI.netStatus('Connection lost – reconnecting…');
+      setTimeout(() => { if (this.ws === ws && this.role) this.open(); }, 1500);
+    };
+  },
+  raw(o) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(o)); },
+  push(event, payload) { this.raw({ topic: this.topic, event, payload, ref: String(this.ref++) }); },
+  send(msg) { if (this.joined) this.push('broadcast', { type: 'broadcast', event: 'm', payload: msg }); },
+  begin(code, role) {
+    this.leave();
+    Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, peerLost: false, lastPeer: performance.now(),
+      events: [], remote: { fp: 0, jp: 0 }, fpSeen: 0, jpSeen: 0, fp: 0, jp: 0, lastIn: '', myTeam: role === 'host' ? 0 : 1 });
+    this.open();
+  },
+  leave() { const ws = this.ws; this.ws = null; this.role = null; this.joined = false; this.started = false; if (ws) try { ws.close(); } catch (e) { } },
+  // ---- lobby ----
+  host() {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code = ''; for (let i = 0; i < 5; i++) code += A[Math.random() * A.length | 0];
+    this.begin(code, 'host');
+    const link = `${location.origin}${location.pathname}?room=${code}`;
+    UI.hideAll();
+    UI.lobby('Hosting online game', `<p>Send this code to your friend:</p><div class="code">${code}</div>
+      <p class="center"><button id="copyBtn">Copy invite link</button></p><p class="small center" id="netStatus">Connecting…</p>`);
+    $('copyBtn').onclick = () => { navigator.clipboard?.writeText(link).then(() => { $('copyBtn').textContent = 'Link copied!'; }, () => prompt('Copy this link:', link)); };
+  },
+  join(code) {
+    this.begin(code, 'guest');
+    UI.hideAll();
+    UI.lobby('Joining game', `<div class="code">${code}</div><p class="small center" id="netStatus">Connecting…</p>`);
+  },
+  onJoined() {
+    if (this.role === 'host') UI.netStatus(this.started ? 'Reconnected.' : 'Waiting for your friend to join…');
+    else { UI.netStatus(this.started ? 'Reconnected – syncing…' : 'Looking for the host…'); this.hello(); }
+  },
+  hello() { const t = settings.teams[0]; this.send({ t: 'hello', name: t.name, color: t.color }); this.helloT = 0; },
+  startGame(info) {           // host: build the match and hand the guest everything it needs
+    this.guestInfo = info; this.started = true;
+    const me = settings.teams[0]; let gc = info.color | 0; if (gc === me.color) gc = (me.color + 1) % TEAM_COLORS.length;
+    UI.hideAll();
+    newGame({ teams: [{ name: me.name, color: me.color, ai: false }, { name: String(info.name || 'Friend').slice(0, 18), color: gc, ai: false }] });
+    this.sendInit();
+  },
+  sendInit() {
+    this.send({ t: 'init', seed: g.seed, map: settings.map, turnTime: settings.turnTime, sdMinutes: settings.sdMinutes,
+      teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
+  },
+  onMsg(m) {
+    if (m.t === 'bye') { UI.netStatus('Your friend left the game.'); this.peerLost = true; return; }
+    if (this.role === 'host') {
+      switch (m.t) {
+        case 'hello': if (!this.started || g.state === 'menu') this.startGame(m); else { this.sendInit(); banner('Your friend (re)joined!', '#8ecae6'); } this.peerLost = false; break;
+        case 'in': this.remote = m; break;
+        case 'w': if (this.guestControls()) selectWeapon(m.id); break;
+        case 'fz': if (this.guestControls() && m.k >= 1 && m.k <= 5) { g.fuse = m.k; g.active.team.fuse = m.k; banner(`Fuse: ${m.k}s`); } break;
+        case 'ck': if (this.guestControls()) applyClick(+m.x, +m.y); break;
+        case 'rm': if (g.state === 'gameover') this.startGame(this.guestInfo); break;
+      }
+    } else {
+      if (m.t === 'init') this.setupGuest(m);
+      else if (m.t === 's' && this.started) { applyEvents(m.ev); applySnap(m); }
+    }
+  },
+  guestControls() { return g.state === 'turn' && g.controlling && g.active && g.active.team.idx !== this.myTeam; },
+  remoteInput() {             // host: turn the guest's latest input packet into one tick of input
+    const R = this.remote, inp = blankInput();
+    if (!this.peerLost) { inp.left = !!R.l; inp.right = !!R.r; inp.up = !!R.u; inp.down = !!R.d; inp.fireHeld = !!R.fh; }
+    if ((R.fp | 0) > this.fpSeen) { this.fpSeen++; inp.firePress = true; }
+    if ((R.jp | 0) > this.jpSeen) { this.jpSeen++; inp.jumpPress = true; }
+    return inp;
+  },
+  ev(code, args) { if (this.role === 'host' && !this.mute) this.events.push([code, ...netCopy(args)]); },
+  // ---- per-frame ----
+  update(real) {
+    if (!this.role || !this.joined) return;
+    if ((this.hbT += real) > 2) { this.hbT = 0; this.send({ t: 'hb' }); }
+    if (this.started && !this.peerLost && performance.now() - this.lastPeer > 9000) { this.peerLost = true; UI.netStatus(this.role === 'host' ? 'Your friend seems to have disconnected…' : 'Lost contact with the host…'); }
+    if (this.role === 'host') {
+      if (this.started && g.state !== 'menu' && ((this.snapT += real) > 1 / 15 || this.events.length > 250)) { this.snapT = 0; const s = this.snap(); s.ev = this.events; this.events = []; this.send(s); }
+    } else if (!this.started) { if ((this.helloT += real) > 1.5) this.hello(); }
+    else this.guestInput(real);
+  },
+  guestInput(real) {
+    const mine = myTurn() && g.controlling, d = Input.down, p = Input.pressed, blocked = UI.blocking() || !mine;
+    if (!blocked) {
+      if (p.has('Space')) this.fp++;
+      if (p.has('Enter') || p.has('NumpadEnter')) this.jp++;
+      for (let k = 1; k <= 5; k++) if (p.has('Digit' + k) || p.has('Numpad' + k)) { this.send({ t: 'fz', k }); g.fuse = k; }
+    }
+    const st = blocked ? { l: 0, r: 0, u: 0, d: 0, fh: 0 } : { l: +!!(d.ArrowLeft || d.KeyA), r: +!!(d.ArrowRight || d.KeyD), u: +!!(d.ArrowUp || d.KeyW), d: +!!(d.ArrowDown || d.KeyS), fh: +!!d.Space };
+    st.fp = this.fp; st.jp = this.jp; st.t = 'in';
+    const key = JSON.stringify(st);
+    if (key !== this.lastIn || (this.inT += real) > 0.3) { this.send(st); this.lastIn = key; this.inT = 0; }
+    p.clear(); Input.released.clear();
+  },
+  // ---- snapshots ----
+  snap() {
+    const t = Net.started ? camTarget() : null;
+    return { t: 's', st: g.state, tt: nr(g.turnT), w: nr(g.wind), wp: g.weapon, fu: g.fuse, tg: g.target ? [nr(g.target.x), nr(g.target.y)] : 0,
+      ch: g.charging, pw: nr(g.power), rt: g.retreat, fi: g.fired, lw: g.lockWeapon, ct: g.controlling, ga: nr(g.girderAng), sl: g.shotsLeft, rb: !!g.robot,
+      a: g.active ? g.active.id : 0, wy: nr(g.waterY), sd: g.sd, tm: nr(g.time), ts: nr(g.turnStartT), sm: nr(g.slowmo), sh: nr(g.shake), win: g.winner ? g.winner.idx : -1,
+      cf: t ? [nr(t.x), nr(t.y)] : 0, am: g.teams.map(t => t.ammo),
+      c: g.critters.map(c => [c.id, c.team.idx, c.name, ...CRIT_F.map(f => nr(c[f])), c.say ? [c.say.text, nr(c.say.t)] : 0]),
+      e: g.ents.filter(e => !(e instanceof Critter) && !e.dead).map(e => { const k = NET_KIND.get(e.constructor); if (!k) return null; if (e instanceof Rope) e.cId = e.c.id;
+        return [k.code, e.id, nr(e.x), nr(e.y), nr(e.vx || 0), nr(e.vy || 0), ...k.f.map(f => nr(e[f]))]; }).filter(Boolean) };
+  },
+  setupGuest(m) {
+    UI.hideAll(); this.started = true; this.peerLost = false;
+    g = makeState(); g.online = true; g.seed = m.seed; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
+    Terrain.generate(m.map, m.seed); bg = makeBackground(m.seed, Terrain.cavern);
+    applyEvents(m.log);
+    g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, fuse: 3, lastWeapon: 'bomb' }));
+    applySnap(m.snap);
+    cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
+    banner(`Joined ${m.teams[0].name}'s game!`, m.teams[1].color);
+  },
+};
+const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust'];
+const NET_KINDS = [
+  ['P', Proj, ['type', 'spin', 'fuseT', 'armT', 'trigT', 'stuck']], ['M', Mine, ['trigT', 'spent', 'blink']], ['B', Barrel, ['fuseT']],
+  ['C', Crate, ['type', 'chute', 'sway']], ['G', Grave, ['col']], ['L', Lava, ['life', 'stuck']], ['V', Volcano, ['t']],
+  ['R', Robot, ['dir', 'legPh', 't']], ['A', Anvil, []], ['E', Pelican, ['dir', 'flap']], ['H', Rope, ['cId', 'tx', 'ty', 'state']],
+];
+const NET_KIND = new Map(NET_KINDS.map(([code, cls, f]) => [cls, { code, cls, f }]));
+const NET_CODE = new Map(NET_KINDS.map(([code, cls, f]) => [code, { code, cls, f }]));
+
+// Host-side recording: wrap cosmetic + terrain functions so each top-level call becomes an event.
+// Nested calls (particles spawned inside fxExplosion, tones inside Sfx.boom…) are muted.
+const NET_FN = {};
+function netWrap(code, fn, self) {
+  NET_FN[code] = fn.bind(self);
+  return function (...a) {
+    if (Net.role === 'host' && !Net.mute) { Net.ev(code, a); if (code === 'c' || code === 'g') Net.log.push([code, ...netCopy(a)]); }
+    Net.mute++; try { return fn.apply(self ?? this, a); } finally { Net.mute--; }
+  };
+}
+P = netWrap('p', P); fxExplosion = netWrap('x', fxExplosion); splashFx = netWrap('w', splashFx); dustFx = netWrap('d', dustFx);
+addText = netWrap('t', addText); banner = netWrap('b', banner); addTracer = netWrap('r', addTracer);
+Terrain.carve = netWrap('c', Terrain.carve, Terrain); Terrain.girder = netWrap('g', Terrain.girder, Terrain);
+// Sounds: only network calls that actually reached tone()/noise(), i.e. got past their own throttles
+for (const k of Object.keys(Sfx)) {
+  const fn = Sfx[k]; if (typeof fn !== 'function' || k === 'init' || k === 'ok') continue;
+  NET_FN['s.' + k] = fn.bind(Sfx);
+  Sfx[k] = function (...a) {
+    if (Net.mute || Net.role !== 'host') { Net.mute++; try { return fn.apply(Sfx, a); } finally { Net.mute--; } }
+    this._hit = false; Net.mute++; let r; try { r = fn.apply(Sfx, a); } finally { Net.mute--; }
+    if (this._hit) Net.events.push(['s.' + k, ...netCopy(a)]);
+    return r;
+  };
+}
+function applyEvents(evs) {
+  if (!evs) return;
+  for (const e of evs) { const fn = NET_FN[e[0]]; if (fn) try { fn(...e.slice(1)); } catch (err) { } }
+}
+// Guest: merge a snapshot into local objects (reusing them by id so drawing stays smooth)
+function applySnap(s) {
+  const prevState = g.state;
+  Object.assign(g, { state: s.st, turnT: s.tt, wind: s.w, weapon: s.wp, fuse: s.fu, target: s.tg ? { x: s.tg[0], y: s.tg[1] } : null, charging: s.ch, power: s.pw,
+    retreat: s.rt, fired: s.fi, lockWeapon: s.lw, controlling: s.ct, girderAng: s.ga, shotsLeft: s.sl, robot: s.rb ? {} : null, waterY: s.wy, sd: s.sd,
+    turnStartT: s.ts, slowmo: s.sm, netFocus: s.cf ? { x: s.cf[0], y: s.cf[1] } : null });
+  g.shake = Math.max(g.shake, s.sh);
+  if (Math.abs(g.time - s.tm) > 0.5) g.time = s.tm;
+  if (s.am) s.am.forEach((a, i) => { if (g.teams[i]) g.teams[i].ammo = a; });
+  const byId = new Map(g.critters.map(c => [c.id, c]));
+  for (const a of s.c) {
+    let c = byId.get(a[0]);
+    if (!c) { c = new Critter(g.teams[a[1]], a[2]); c.id = a[0]; g.teams[a[1]].critters.push(c); g.critters.push(c); c.x = a[3]; c.y = a[4]; }
+    CRIT_F.forEach((f, i) => { if (f === 'x') c._nx = a[3 + i]; else if (f === 'y') c._ny = a[3 + i]; else c[f] = a[3 + i]; });
+    const say = a[3 + CRIT_F.length]; c.say = say ? { text: say[0], t: say[1] } : null;
+  }
+  const old = new Map(g.ents.map(e => [e.id, e])), ents = [];
+  for (const a of s.e) {
+    const k = NET_CODE.get(a[0]); if (!k) continue;
+    let e = old.get(a[1]);
+    if (!e || !(e instanceof k.cls)) { e = Object.create(k.cls.prototype); e.id = a[1]; e.x = a[2]; e.y = a[3]; e.r = 6; e.dead = false; }
+    e._nx = a[2]; e._ny = a[3]; e.vx = a[4]; e.vy = a[5];
+    k.f.forEach((f, i) => { e[f] = a[6 + i]; });
+    if (k.cls === Proj) Object.assign(e, PROJ[e.type] ? { r: PROJ[e.type].r, fuse: PROJ[e.type].fuse } : {});
+    if (k.cls === Rope) e.c = byId.get(e.cId) || g.critters.find(c => c.id === e.cId);
+    ents.push(e);
+  }
+  g.ents = ents;
+  const prevActive = g.active;
+  g.active = g.critters.find(c => c.id === s.a) || null;
+  if (g.state === 'turn' && (g.active !== prevActive || prevState !== 'turn')) turnBanner();
+  if (s.win >= 0) g.winner = g.teams[s.win];
+  if (s.st === 'gameover' && prevState !== 'gameover') g.overT = 2.2;
+  if (!g.controlling && UI.pickerOpen) UI.togglePicker();
+  Net.snapAt = performance.now();
+}
+// Guest frame: glide every object toward its (velocity-extrapolated) snapshot position
+function guestTick(dt) {
+  g.time += dt;
+  const age = Math.min(0.12, (performance.now() - Net.snapAt) / 1000), k = 1 - Math.exp(-dt * 18);
+  const glide = e => {
+    if (e._nx === undefined) return;
+    const tx = e._nx + (e.vx || 0) * age, ty = e._ny + (e.vy || 0) * age;
+    if (Math.abs(tx - e.x) > 150 || Math.abs(ty - e.y) > 150) { e.x = tx; e.y = ty; } else { e.x += (tx - e.x) * k; e.y += (ty - e.y) * k; }
+  };
+  for (const c of g.critters) if (c.alive) { glide(c); c.eyes(dt); c.trail(); }
+  for (const e of g.ents) { glide(e); if (e.trail && e.x !== undefined) e.trail(); }
+  updateFx(dt);
+  if (g.overT > 0 && (g.overT -= dt) <= 0) UI.showOver();
 }
 
 // boot
 resize();
 Terrain.init();
-bindMouse(canvas);
+bindPointer(canvas);
+bindTouchButtons();
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches) UI.showTouch(true);
 UI.showMenu();
+{ const room = new URLSearchParams(location.search).get('room'); if (room) { $('joinCode').value = room.toUpperCase().slice(0, 6); $('onlineBox').classList.add('invited'); } }
 requestAnimationFrame(frame);
 </script>
 </body>
