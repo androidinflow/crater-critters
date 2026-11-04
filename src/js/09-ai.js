@@ -51,13 +51,20 @@ function* aiPlan(c) {
     if (has('chili') && d < 120) consider({ w: 'chili', facing, angle, tx: e.x, score: 24 - d * 0.05 });
     if (has('stomp') && d < 140 && c.mode === 'ground') consider({ w: 'stomp', facing, angle: c.aim, tx: e.x, score: 10 + (1 - d / 150) * 14 + (willFall(e.x + facing * 60, e.y) ? 40 : 0) });
     if (has('shower')) consider({ w: 'shower', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: scoreBlast(c, e.x, e.y, 130, 30) * 0.9 + 6 });
+    if (has('zap') && d < 680 && lineClear(c.x, c.y, e.x, e.y)) { let extra = 0; for (const o of g.critters) if (o.alive && o !== e && o !== c && Math.hypot(o.x - e.x, o.y - e.y) < 120) extra += o.team !== team ? 14 : -14; consider({ w: 'zap', facing, angle, tx: e.x, score: Math.min(24, e.hp - e.pending) + extra + 2 }); }
+    if (has('freeze') && d < 630 && e.frozen <= 0 && lineClear(c.x, c.y, e.x, e.y)) consider({ w: 'freeze', facing, angle, tx: e.x, score: 10 + Math.min(30, e.hp - e.pending) * 0.3 });
+    if (has('balloon') && e.frozen <= 0) consider({ w: 'balloon', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: 16 + Math.abs(g.wind) * 18 + (willFall(e.x + Math.sign(g.wind || 1) * 300, e.y) ? 30 : 0) });
     if (has('rifle') && d < 1100 && lineClear(c.x, c.y, e.x, e.y)) consider({ w: 'rifle', facing, angle, tx: e.x, score: Math.min(38, e.hp - e.pending) + (willFall(e.x + facing * 30, e.y) ? 15 : 0) + (e.hp - e.pending <= 38 ? 25 : 0) - d * 0.005 });
   }
+  // map-wide weapons: judged on the whole board rather than one enemy
+  if (has('quake') && c.mode === 'ground') { let s = 6; for (const o of g.critters) if (o.alive && o !== c) { const edge = willFall(o.x + 30, o.y) || willFall(o.x - 30, o.y); s += o.team !== team ? 3 + (edge ? 22 : 0) : -(3 + (edge ? 30 : 0)); } consider({ w: 'quake', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
+  if (has('flood')) { let s = -4; for (const o of g.critters) if (o.alive && o.y > g.waterY - 75) s += o.team !== team ? 70 : -90; consider({ w: 'flood', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
+  if (has('karma')) { const alive = g.critters.filter(o => o.alive), avg = alive.reduce((a, o) => a + o.hp - o.pending, 0) / alive.length, mine = alive.filter(o => o.team === team), myAvg = mine.reduce((a, o) => a + o.hp - o.pending, 0) / mine.length; if (myAvg < avg - 12) consider({ w: 'karma', facing: c.facing, angle: c.aim, tx: c.x, score: (avg - myAvg) * mine.length * 0.7 }); }
   yield;
   // Brute-force trajectory search: sweep aim angle × launch power for each ballistic weapon,
   // simulate, and score the detonation point. Spread across frames via `yield`.
-  const ballistic = ['rocket', 'bomb', 'melon', 'skunk', 'acorn', 'mortar', 'vortex'].filter(has);
-  const RD = { rocket: [50, 50], bomb: [48, 48], melon: [58, 50], skunk: [60, 32], acorn: [95, 90], mortar: [40, 50], vortex: [120, 26] };
+  const ballistic = ['rocket', 'bomb', 'melon', 'skunk', 'acorn', 'mortar', 'vortex', 'frog'].filter(has);
+  const RD = { rocket: [50, 50], bomb: [48, 48], melon: [58, 50], skunk: [60, 32], acorn: [95, 90], mortar: [40, 50], vortex: [120, 26], frog: [75, 40] };
   let n = 0;
   for (const w of ballistic) for (const facing of [-1, 1]) for (let a = -1.45; a <= 0.75; a += 0.08) for (let p = 0.2; p <= 1.001; p += 0.05) {
     const imp = simulateShot(c, w, facing, a, p);
@@ -70,6 +77,7 @@ function* aiPlan(c) {
       if (w === 'acorn') s += 4;
       if (w === 'mortar') s -= 3;
       if (w === 'vortex') s -= 10;
+      if (w === 'frog') s -= 4;
       consider({ w, facing, angle: a, power: p, score: s, tx: imp.x, ty: imp.y, fuse: 3 });
     }
     if (++n % 24 === 0) yield;

@@ -29,10 +29,11 @@ class Critter extends Body {
       say: null, hurtT: 0, sadT: 0, jumpT: 0, fuel: 0, rope: null, swing: 0, ropeDL: 0, thrust: false, jetX: 0,
       voice: rand(330, 640), seed: rand(0, 10), stillT: 0, dyingT: 0, burnQuipT: 0,
       // animation state (cosmetic): walk blend, idle timer, blink countdown, look-around target, face code + timer
-      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0 });
+      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0, frozen: 0, balloon: null });
   }
   busy() { return this.alive && this.mode !== 'ground'; }
   knocked() {
+    if (this.frozen > 0) return;   // a block of ice does not budge
     if (this.mode === 'rope' || this.mode === 'jet') this.release();
     this.mode = 'air'; this.tumble = true; this.fallDmg = true; this.spinV = rand(-18, 18); this.flipV = 0;
   }
@@ -79,6 +80,7 @@ class Critter extends Body {
         break;
       case 'rope': this.ropePhysics(dt); break;
       case 'jet': this.jetPhysics(dt); break;
+      case 'float': this.floatPhysics(dt); break;
     }
     this.eyes(dt); localFx(this);
     if (this.y > g.waterY - 2) killCritter(this, 'water');
@@ -134,6 +136,17 @@ class Critter extends Body {
       this.vx *= 0.5; if (this.vy > 0) this.vy = 0; settle(this);
       if (this.fuel <= 0) this.land(0);
     }
+  }
+  // Party Balloon: drift up and with the wind until the balloon pops, then drop like a stone
+  floatPhysics(dt) {
+    const B = this.balloon;
+    if (!B || B.dead) { this.balloon = null; this.mode = 'air'; this.fallDmg = true; this.tumble = true; this.spinV = rand(-9, 9); return; }
+    this.vy += (-75 - this.vy) * Math.min(1, 3 * dt); this.vx += (g.wind * 110 - this.vx) * Math.min(1, 1.5 * dt);
+    let nx = this.x + this.vx * dt, ny = this.y + this.vy * dt;
+    if (circleHits(nx, this.y, this.r)) { this.vx = 0; nx = this.x; }
+    if (circleHits(this.x, ny - 28, this.r + 2) || ny < -220) { this.vy = 0; ny = this.y; }   // balloon bumps the ceiling
+    this.x = nx; this.y = ny;
+    if (Math.abs(this.vx) > 8) this.facing = Math.sign(this.vx);
   }
   trail() { if (this.mode === 'jet' && this.thrust && this.fuel > 0 && Math.random() < 0.8) P({ kind: 'fire', x: this.x - this.facing * 6, y: this.y + 8, vx: rand(-20, 20), vy: rand(120, 220), g: 0, drag: 0.9, size: rand(3, 6), life: 0.25 }); }
   // Cosmetic timers (run on host and guest alike): walk blend, idle clock, blinks, faces.
@@ -251,6 +264,8 @@ const PROJ = {
   shell:    { r: 3, bounce: 0,    friction: 0,    windF: 0.3,  impact: true, R: 30, dmg: 22 },
   meteor:   { r: 5, bounce: 0,    friction: 0,    windF: 0,    impact: true, R: 40, dmg: 34 },
   vortex:   { r: 6, bounce: 0.3,  friction: 0.3,  windF: 0,    fuse: true,   R: 30, dmg: 18 },
+  frog:     { r: 6, bounce: 0.2,  friction: 0.5,  windF: 0,    R: 42, dmg: 40, hop: true },
+  seed:     { r: 3, bounce: 0.35, friction: 0.4,  windF: 0.1,  R: 0,  dmg: 0,  plant: true },
 };
 PROJ.mortar = PROJ.shell;   // lets the AI simulate a mortar shot
 class Proj extends Body {
@@ -295,6 +310,8 @@ class Proj extends Body {
       }
       if (this.rest && this.fuseT > 1) this.fuseT = 1;   // stopped: pop soon
     }
+    if (this.hop) { this.hopLogic(dt); if (this.dead) return; }
+    if (this.plant && this.rest) { this.dead = true; const m = spawn(new Mine(this.x, this.y - 2, false)); m.rest = true; Sfx.tick(); addText(this.x, this.y - 14, 'armed', '#ff6b6b', 11, 0.8); return; }
     if (this.fuse && (this.fuseT -= dt) <= 0) return this.boom();
     this.spin += this.vx * dt * 0.06;
     this.checkBounds();
@@ -307,6 +324,19 @@ class Proj extends Body {
     if (t === 'meteor') P({ kind: 'fire', x: this.x + rand(-3, 3), y: this.y - 4, vx: -this.vx * 0.1, vy: -this.vy * 0.1, g: 0, drag: 0.9, size: rand(4, 7), life: 0.3 });
     if (t === 'vortex' && Math.random() < 0.5) P({ kind: 'spark', x: this.x, y: this.y, vx: rand(-60, 60), vy: rand(-60, 60), g: 0, drag: 0.9, size: 1.5, life: 0.3, col: '#c77dff' });
     if (t === 'bowling' && this.rest === false && Math.random() < 0.4) dustFx(this.x, this.y + 6, 1);
+  }
+  hopLogic(dt) {   // Hopper Frog: sits, then springs toward the nearest enemy; bursts on touch or after four hops
+    if (this.age > 9) return this.boom();
+    for (const c of g.critters) if (c.alive && c !== this.owner && (c.x - this.x) ** 2 + (c.y - this.y) ** 2 < (c.r + this.r + 2) ** 2) return this.boom();
+    if (!this.rest) return;
+    this.hopT = (this.hopT || 0) + dt; if (this.hopT < 0.55) return;
+    this.hopT = 0; this.hops = (this.hops || 0) + 1;
+    if (this.hops > 4) return this.boom();
+    let near = null, nd = 1e9;
+    for (const c of g.critters) if (c.alive && c !== this.owner) { const d = Math.hypot(c.x - this.x, c.y - this.y); if (d < nd) { nd = d; near = c; } }
+    const dir = near ? (Math.sign(near.x - this.x) || 1) : pick([-1, 1]);
+    this.rest = false; this.vx = dir * clamp(nd * 1.2, 90, 190); this.vy = near && near.y < this.y - 30 ? -360 : -280; this.y -= 1;
+    Sfx.boing(); dustFx(this.x, this.y + this.r, 3);
   }
   curveBack(dt) {   // boomerang: after a short flight it homes back on its thrower
     const o = this.owner; if (!o || this.age < 0.45) return;
@@ -444,6 +474,41 @@ class Shower {
     this.t += dt;
     if (this.n < 7 && this.t > 0.5 + this.n * 0.28) { this.n++; const mx = this.x + rand(-230, 230); spawn(new Proj('meteor', mx, -30, rand(-50, 50), rand(280, 380))); Sfx.whoosh(); }
     if (this.n >= 7 && this.t > 5) this.dead = true;
+  }
+}
+// Party Balloon: tied to a critter, carries it up and sideways, pops after a few seconds (or when shot)
+class Balloon {
+  constructor(c) {
+    Object.assign(this, { c, cId: c.id, x: c.x, y: c.y - 30, r: 11, t: 0, popT: 4.2, dead: false, important: true });
+    c.release(); c.balloon = this; c.mode = 'float'; c.tumble = false; c.spin = 0; c.vy = Math.min(c.vy, 0);
+  }
+  busy() { return true; }
+  update(dt) {
+    const c = this.c; if (!c || !c.alive || c.mode !== 'float') return this.pop(false);
+    this.t += dt; this.x = c.x + Math.sin(this.t * 3) * 3; this.y = c.y - 30;
+    if ((this.popT -= dt) <= 0) this.pop(true);
+  }
+  pop(loud) {
+    if (this.dead) return; this.dead = true; if (this.c && this.c.balloon === this) this.c.balloon = null;
+    if (loud) { Sfx.clack(); addText(this.x, this.y - 10, 'POP!', '#ff7aa2', 16, 0.8); for (let i = 0; i < 12; i++) P({ kind: 'spark', x: this.x, y: this.y, vx: rand(-160, 160), vy: rand(-160, 160), g: 200, drag: 0.95, size: 2.5, life: 0.5, col: '#ff7aa2' }); }
+  }
+  onBlast(f) { if (f > 0.15) this.pop(true); }
+}
+// Earthquake: three seconds of shaking; everyone is bounced, loose objects roll, the surface crumbles
+class Quake {
+  constructor(owner) { Object.assign(this, { x: CFG.W / 2, y: 0, owner, t: 0, pulse: 0, dead: false }); Sfx.rumble(); }
+  busy() { return true; }
+  update(dt) {
+    this.t += dt; shake(7);
+    if (this.t > this.pulse * 0.2) {
+      this.pulse++;
+      for (const c of g.critters) if (c.alive && c.mode === 'ground' && c.frozen <= 0) { c.vx += rand(-70, 70); c.vy = -rand(60, 150); c.mode = 'air'; c.fallDmg = false; c.squash = 0.2; }
+      for (const e of g.ents) if (e !== this && !e.dead && !(e instanceof Critter) && e.rest !== undefined && e.vx !== undefined) { e.rest = false; e.vx += rand(-60, 60); e.vy -= rand(30, 90); }
+      if (this.pulse % 5 === 0) for (const c of g.critters) if (c.alive && c !== this.owner) hurt(c, 3);
+      for (let k = 0; k < 2; k++) { const x = rand(40, CFG.W - 40); let y = Terrain.cavern ? 40 : 0; while (y < g.waterY && !Terrain.solid(x, y)) y += 4; if (y < g.waterY) { Terrain.carve(x, y + 3, rand(5, 9)); dustFx(x, y, 3); } }
+      if (this.pulse % 3 === 0) Sfx.rumble();
+    }
+    if (this.t > 3) this.dead = true;
   }
 }
 // Acorn Mortar: fires a three-shell burst along the same arc

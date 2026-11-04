@@ -217,6 +217,7 @@
       <div>Mole Drill: dig a tunnel along your aim · Pogo Stick: giant safe jump</div>
       <div>Hedge Bowling rolls far · Twig Boomerang comes back (catch it!) · Acorn Mortar: 3-shell burst</div>
       <div>Sunbeam burns through terrain · Gravity Acorn pulls everyone in · Chili Breath &amp; Thunder Stomp: close range</div>
+      <div>Static Jar chains between critters · Freeze Ray costs a turn · Flood raises the water · Critter Cannon fires <em>you</em></div>
       <div>Star Shower: click for a meteor storm · Switcheroo: click a critter to swap places</div>
       <div>Girder: <kbd>↑</kbd><kbd>↓</kbd> rotates the plank</div>
       <div>Rope: <kbd>←</kbd><kbd>→</kbd> swing, <kbd>↑</kbd><kbd>↓</kbd> climb, <kbd>Space</kbd> let go</div>
@@ -345,12 +346,21 @@ const WEAPONS = [
   { id:'stomp',    name:'Thunder Stomp',  kind:'instant',hint:'Launch everyone around you skyward.', desc:'Slam the ground: everyone nearby is launched skyward. No fall damage for them.', stats:'6–20 dmg · launches' },
   { id:'shower',   name:'Star Shower',    kind:'click',  hint:'Click: meteors rain over a wide area.', air:true, desc:'Click a spot. Seven meteors rain across a wide area. Not in caverns.', stats:'7 × 34 dmg · R 40 · wide' },
   { id:'swap',     name:'Switcheroo',     kind:'click',  hint:'Click a critter to swap places with it.', desc:'Click any critter to trade places with it. Steal their perch, leave them your cliff edge.', stats:'no damage · instant' },
+  { id:'frog',     name:'Hopper Frog',    kind:'charge', hint:'Lands, then hops after the nearest enemy.', desc:'Throw a frog bomb. Once it lands it hops toward the nearest enemy, up to four hops, and bursts when it reaches one.', stats:'40 dmg · R 42 · 4 hops' },
+  { id:'zap',      name:'Static Jar',     kind:'instant',hint:'Lightning that chains between critters.', desc:'Hitscan lightning. The first critter hit takes the full jolt, then it arcs to up to three more critters standing within 120 px of each other.', stats:'24 dmg + 3 × 16 · chains' },
+  { id:'freeze',   name:'Freeze Ray',     kind:'instant',hint:'Freeze a critter solid: it skips a turn.', desc:'A beam that encases the first critter hit in ice. Frozen critters skip their next turn, take half damage and cannot be knocked around.', stats:'skips 1 turn · half dmg' },
+  { id:'balloon',  name:'Party Balloon',  kind:'click',  hint:'Click a critter to float it away.', desc:'Click any critter (even yourself). A balloon lifts them into the sky and drifts with the wind for four seconds, then pops. Mind the drop.', stats:'4 s flight · fall damage' },
+  { id:'quake',    name:'Earthquake',     kind:'instant',hint:'Shake the whole island.', desc:'Shakes the entire map for three seconds. Everyone is jostled off their feet, loose objects roll, and the ground crumbles in random places.', stats:'9 dmg to all · map-wide' },
+  { id:'flood',    name:'Flood',          kind:'instant',hint:'The water rises 60 px.', desc:'Raises the water level by 60 px right away. Anyone standing low enough goes for a swim.', stats:'water +60 px · permanent' },
+  { id:'spitter',  name:'Mine Spitter',   kind:'charge', hint:'Spits three seeds that grow into mines.', desc:'Fires three seeds in a spread. Wherever they come to rest, a live mine sprouts. Area denial for the patient.', stats:'3 mines × 42 dmg · R 46' },
+  { id:'karma',    name:'Karma Jar',      kind:'instant',hint:'Everyone gets the average HP.', desc:'Opens a jar of fairness: every living critter is set to the average HP of all survivors. A comeback in a bottle, or a terrible idea.', stats:'HP → average · everyone' },
   { id:'grapple',  name:'Grapple Hook',   kind:'tool',   hint:'Space: shoot rope.', util:true, desc:'Fire a rope at terrain. Swing with ←→, climb with ↑↓, release with fire.', stats:'rope 18–420 px' },
   { id:'jetpack',  name:'Jetpack',        kind:'tool',   hint:'Space: ignite.', util:true, desc:'Four seconds of fuel. Hold ↑ to thrust, ←→ to steer. No fall damage while flying.', stats:'fuel 4 s' },
   { id:'teleport', name:'Teleport Pad',   kind:'click',  hint:'Click a destination.', util:true, desc:'Click any open spot to blink there instantly. Ends your move.', stats:'unlimited range' },
   { id:'girder',   name:'Girder',         kind:'click',  hint:'↑↓ rotate · click to place', util:true, desc:'Place a steel girder: rotate with ↑↓, click to drop. Bridges, walls, roofs.', stats:'rotatable · permanent' },
   { id:'drill',    name:'Mole Drill',     kind:'instant',hint:'Space: dig a tunnel along your aim.', util:true, desc:'Burrow a tunnel in the direction you aim. Ends underground, safe and sneaky.', stats:'digs ~34 px wide' },
   { id:'pogo',     name:'Pogo Stick',     kind:'tool',   hint:'Space: BOING! No fall damage.', util:true, desc:'Hop around on a pogo stick. Big bounces, no fall damage, a little shove on landing.', stats:'no fall damage' },
+  { id:'cannon',   name:'Critter Cannon', kind:'charge', hint:'Hold Space to charge, release to launch YOURSELF.', desc:'Climb into the cannon, charge, and fire yourself along your aim. No fall damage on landing, and your turn carries on.', stats:'self-launch · no fall dmg', util:true },
   { id:'skip',     name:'Skip Turn',      kind:'tool',   hint:'Space: snooze.', util:true, desc:'Take a nap and pass the turn. Sometimes the best move.', stats:'ends turn' },
 ];
 const WEAP = Object.fromEntries(WEAPONS.map(w => [w.id, w]));
@@ -360,28 +370,30 @@ const SCHEMES = {
   'Classic': {
     ammo: { bomb:-1, rocket:-1, bee:1, scatter:-1, melon:2, robot:1, kazoo:-1, pelican:1, anvil:0, volcano:1, dynamite:2, sticky:2,
             rifle:2, skunk:1, slap:-1, thunder:1, acorn:0, bowling:1, boomerang:2, mortar:2, sunbeam:1, vortex:1, chili:1, stomp:2, shower:0, swap:1,
-            grapple:5, jetpack:2, teleport:2, girder:3, drill:2, pogo:2, skip:-1 },
+            frog:2, zap:2, freeze:1, balloon:1, quake:1, flood:0, spitter:1, karma:0,
+            grapple:5, jetpack:2, teleport:2, girder:3, drill:2, pogo:2, cannon:2, skip:-1 },
     crateChance: 0.5, crates: 1, mines: 8, barrels: 5, trap: 0.1,
     pool: ['rocket','bee','melon','robot','pelican','anvil','volcano','dynamite','sticky','grapple','jetpack','teleport','girder','rifle','skunk','thunder','acorn','drill','pogo',
-           'bowling','boomerang','mortar','sunbeam','vortex','chili','stomp','shower','swap'],
+           'bowling','boomerang','mortar','sunbeam','vortex','chili','stomp','shower','swap','frog','zap','freeze','balloon','quake','flood','spitter','karma','cannon'],
   },
   'Melee Only': {
-    ammo: { kazoo:-1, slap:-1, stomp:-1, chili:2, swap:2, bowling:2, vortex:1, dynamite:3, volcano:1, robot:1, sticky:1, skunk:1, grapple:-1, jetpack:3, teleport:1, girder:5, drill:3, pogo:3, skip:-1 },
+    ammo: { kazoo:-1, slap:-1, stomp:-1, chili:2, swap:2, bowling:2, vortex:1, dynamite:3, volcano:1, robot:1, sticky:1, skunk:1, freeze:1, balloon:1, quake:1, spitter:1, karma:1, grapple:-1, jetpack:3, teleport:1, girder:5, drill:3, pogo:3, cannon:3, skip:-1 },
     crateChance: 0.4, crates: 1, mines: 6, barrels: 6, trap: 0.1,
-    pool: ['dynamite','volcano','robot','sticky','skunk','jetpack','teleport','girder','drill','pogo','chili','swap','bowling','vortex'],
+    pool: ['dynamite','volcano','robot','sticky','skunk','jetpack','teleport','girder','drill','pogo','chili','swap','bowling','vortex','freeze','balloon','quake','spitter','cannon'],
   },
   'Chaos Crates': {
     ammo: { bomb:-1, rocket:3, bee:2, scatter:-1, melon:3, robot:2, kazoo:-1, pelican:2, anvil:1, volcano:2, dynamite:3, sticky:3,
             rifle:3, skunk:2, slap:-1, thunder:2, acorn:1, bowling:2, boomerang:3, mortar:3, sunbeam:2, vortex:2, chili:2, stomp:3, shower:1, swap:2,
-            grapple:-1, jetpack:3, teleport:3, girder:5, drill:3, pogo:3, skip:-1 },
+            frog:3, zap:3, freeze:2, balloon:2, quake:2, flood:1, spitter:2, karma:1,
+            grapple:-1, jetpack:3, teleport:3, girder:5, drill:3, pogo:3, cannon:3, skip:-1 },
     crateChance: 1, crates: 2, mines: 14, barrels: 10, trap: 0.2,
     pool: ['rocket','bee','melon','robot','pelican','anvil','anvil','volcano','dynamite','sticky','jetpack','teleport','rifle','skunk','thunder','acorn','acorn','drill','pogo',
-           'bowling','boomerang','mortar','sunbeam','vortex','chili','stomp','shower','shower','swap'],
+           'bowling','boomerang','mortar','sunbeam','vortex','chili','stomp','shower','shower','swap','frog','frog','zap','freeze','balloon','quake','flood','spitter','karma','cannon'],
   },
   'Artillery': {   // long range only: no melee, no mines, big booms
-    ammo: { bomb:-1, rocket:-1, rifle:-1, mortar:-1, melon:3, acorn:1, thunder:2, pelican:2, anvil:1, skunk:2, bee:2, boomerang:3, sunbeam:2, vortex:2, shower:1, grapple:3, teleport:1, girder:2, pogo:2, skip:-1 },
+    ammo: { bomb:-1, rocket:-1, rifle:-1, mortar:-1, melon:3, acorn:1, thunder:2, pelican:2, anvil:1, skunk:2, bee:2, boomerang:3, sunbeam:2, vortex:2, shower:1, frog:3, zap:2, spitter:2, flood:1, balloon:1, grapple:3, teleport:1, girder:2, pogo:2, cannon:2, skip:-1 },
     crateChance: 0.6, crates: 1, mines: 0, barrels: 3, trap: 0.05,
-    pool: ['melon','acorn','thunder','pelican','anvil','skunk','bee','teleport','girder','pogo','boomerang','sunbeam','vortex','shower'],
+    pool: ['melon','acorn','thunder','pelican','anvil','skunk','bee','teleport','girder','pogo','boomerang','sunbeam','vortex','shower','frog','zap','spitter','balloon','cannon'],
   },
 };
 
@@ -878,10 +890,11 @@ class Critter extends Body {
       say: null, hurtT: 0, sadT: 0, jumpT: 0, fuel: 0, rope: null, swing: 0, ropeDL: 0, thrust: false, jetX: 0,
       voice: rand(330, 640), seed: rand(0, 10), stillT: 0, dyingT: 0, burnQuipT: 0,
       // animation state (cosmetic): walk blend, idle timer, blink countdown, look-around target, face code + timer
-      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0 });
+      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0, frozen: 0, balloon: null });
   }
   busy() { return this.alive && this.mode !== 'ground'; }
   knocked() {
+    if (this.frozen > 0) return;   // a block of ice does not budge
     if (this.mode === 'rope' || this.mode === 'jet') this.release();
     this.mode = 'air'; this.tumble = true; this.fallDmg = true; this.spinV = rand(-18, 18); this.flipV = 0;
   }
@@ -928,6 +941,7 @@ class Critter extends Body {
         break;
       case 'rope': this.ropePhysics(dt); break;
       case 'jet': this.jetPhysics(dt); break;
+      case 'float': this.floatPhysics(dt); break;
     }
     this.eyes(dt); localFx(this);
     if (this.y > g.waterY - 2) killCritter(this, 'water');
@@ -983,6 +997,17 @@ class Critter extends Body {
       this.vx *= 0.5; if (this.vy > 0) this.vy = 0; settle(this);
       if (this.fuel <= 0) this.land(0);
     }
+  }
+  // Party Balloon: drift up and with the wind until the balloon pops, then drop like a stone
+  floatPhysics(dt) {
+    const B = this.balloon;
+    if (!B || B.dead) { this.balloon = null; this.mode = 'air'; this.fallDmg = true; this.tumble = true; this.spinV = rand(-9, 9); return; }
+    this.vy += (-75 - this.vy) * Math.min(1, 3 * dt); this.vx += (g.wind * 110 - this.vx) * Math.min(1, 1.5 * dt);
+    let nx = this.x + this.vx * dt, ny = this.y + this.vy * dt;
+    if (circleHits(nx, this.y, this.r)) { this.vx = 0; nx = this.x; }
+    if (circleHits(this.x, ny - 28, this.r + 2) || ny < -220) { this.vy = 0; ny = this.y; }   // balloon bumps the ceiling
+    this.x = nx; this.y = ny;
+    if (Math.abs(this.vx) > 8) this.facing = Math.sign(this.vx);
   }
   trail() { if (this.mode === 'jet' && this.thrust && this.fuel > 0 && Math.random() < 0.8) P({ kind: 'fire', x: this.x - this.facing * 6, y: this.y + 8, vx: rand(-20, 20), vy: rand(120, 220), g: 0, drag: 0.9, size: rand(3, 6), life: 0.25 }); }
   // Cosmetic timers (run on host and guest alike): walk blend, idle clock, blinks, faces.
@@ -1100,6 +1125,8 @@ const PROJ = {
   shell:    { r: 3, bounce: 0,    friction: 0,    windF: 0.3,  impact: true, R: 30, dmg: 22 },
   meteor:   { r: 5, bounce: 0,    friction: 0,    windF: 0,    impact: true, R: 40, dmg: 34 },
   vortex:   { r: 6, bounce: 0.3,  friction: 0.3,  windF: 0,    fuse: true,   R: 30, dmg: 18 },
+  frog:     { r: 6, bounce: 0.2,  friction: 0.5,  windF: 0,    R: 42, dmg: 40, hop: true },
+  seed:     { r: 3, bounce: 0.35, friction: 0.4,  windF: 0.1,  R: 0,  dmg: 0,  plant: true },
 };
 PROJ.mortar = PROJ.shell;   // lets the AI simulate a mortar shot
 class Proj extends Body {
@@ -1144,6 +1171,8 @@ class Proj extends Body {
       }
       if (this.rest && this.fuseT > 1) this.fuseT = 1;   // stopped: pop soon
     }
+    if (this.hop) { this.hopLogic(dt); if (this.dead) return; }
+    if (this.plant && this.rest) { this.dead = true; const m = spawn(new Mine(this.x, this.y - 2, false)); m.rest = true; Sfx.tick(); addText(this.x, this.y - 14, 'armed', '#ff6b6b', 11, 0.8); return; }
     if (this.fuse && (this.fuseT -= dt) <= 0) return this.boom();
     this.spin += this.vx * dt * 0.06;
     this.checkBounds();
@@ -1156,6 +1185,19 @@ class Proj extends Body {
     if (t === 'meteor') P({ kind: 'fire', x: this.x + rand(-3, 3), y: this.y - 4, vx: -this.vx * 0.1, vy: -this.vy * 0.1, g: 0, drag: 0.9, size: rand(4, 7), life: 0.3 });
     if (t === 'vortex' && Math.random() < 0.5) P({ kind: 'spark', x: this.x, y: this.y, vx: rand(-60, 60), vy: rand(-60, 60), g: 0, drag: 0.9, size: 1.5, life: 0.3, col: '#c77dff' });
     if (t === 'bowling' && this.rest === false && Math.random() < 0.4) dustFx(this.x, this.y + 6, 1);
+  }
+  hopLogic(dt) {   // Hopper Frog: sits, then springs toward the nearest enemy; bursts on touch or after four hops
+    if (this.age > 9) return this.boom();
+    for (const c of g.critters) if (c.alive && c !== this.owner && (c.x - this.x) ** 2 + (c.y - this.y) ** 2 < (c.r + this.r + 2) ** 2) return this.boom();
+    if (!this.rest) return;
+    this.hopT = (this.hopT || 0) + dt; if (this.hopT < 0.55) return;
+    this.hopT = 0; this.hops = (this.hops || 0) + 1;
+    if (this.hops > 4) return this.boom();
+    let near = null, nd = 1e9;
+    for (const c of g.critters) if (c.alive && c !== this.owner) { const d = Math.hypot(c.x - this.x, c.y - this.y); if (d < nd) { nd = d; near = c; } }
+    const dir = near ? (Math.sign(near.x - this.x) || 1) : pick([-1, 1]);
+    this.rest = false; this.vx = dir * clamp(nd * 1.2, 90, 190); this.vy = near && near.y < this.y - 30 ? -360 : -280; this.y -= 1;
+    Sfx.boing(); dustFx(this.x, this.y + this.r, 3);
   }
   curveBack(dt) {   // boomerang: after a short flight it homes back on its thrower
     const o = this.owner; if (!o || this.age < 0.45) return;
@@ -1293,6 +1335,41 @@ class Shower {
     this.t += dt;
     if (this.n < 7 && this.t > 0.5 + this.n * 0.28) { this.n++; const mx = this.x + rand(-230, 230); spawn(new Proj('meteor', mx, -30, rand(-50, 50), rand(280, 380))); Sfx.whoosh(); }
     if (this.n >= 7 && this.t > 5) this.dead = true;
+  }
+}
+// Party Balloon: tied to a critter, carries it up and sideways, pops after a few seconds (or when shot)
+class Balloon {
+  constructor(c) {
+    Object.assign(this, { c, cId: c.id, x: c.x, y: c.y - 30, r: 11, t: 0, popT: 4.2, dead: false, important: true });
+    c.release(); c.balloon = this; c.mode = 'float'; c.tumble = false; c.spin = 0; c.vy = Math.min(c.vy, 0);
+  }
+  busy() { return true; }
+  update(dt) {
+    const c = this.c; if (!c || !c.alive || c.mode !== 'float') return this.pop(false);
+    this.t += dt; this.x = c.x + Math.sin(this.t * 3) * 3; this.y = c.y - 30;
+    if ((this.popT -= dt) <= 0) this.pop(true);
+  }
+  pop(loud) {
+    if (this.dead) return; this.dead = true; if (this.c && this.c.balloon === this) this.c.balloon = null;
+    if (loud) { Sfx.clack(); addText(this.x, this.y - 10, 'POP!', '#ff7aa2', 16, 0.8); for (let i = 0; i < 12; i++) P({ kind: 'spark', x: this.x, y: this.y, vx: rand(-160, 160), vy: rand(-160, 160), g: 200, drag: 0.95, size: 2.5, life: 0.5, col: '#ff7aa2' }); }
+  }
+  onBlast(f) { if (f > 0.15) this.pop(true); }
+}
+// Earthquake: three seconds of shaking; everyone is bounced, loose objects roll, the surface crumbles
+class Quake {
+  constructor(owner) { Object.assign(this, { x: CFG.W / 2, y: 0, owner, t: 0, pulse: 0, dead: false }); Sfx.rumble(); }
+  busy() { return true; }
+  update(dt) {
+    this.t += dt; shake(7);
+    if (this.t > this.pulse * 0.2) {
+      this.pulse++;
+      for (const c of g.critters) if (c.alive && c.mode === 'ground' && c.frozen <= 0) { c.vx += rand(-70, 70); c.vy = -rand(60, 150); c.mode = 'air'; c.fallDmg = false; c.squash = 0.2; }
+      for (const e of g.ents) if (e !== this && !e.dead && !(e instanceof Critter) && e.rest !== undefined && e.vx !== undefined) { e.rest = false; e.vx += rand(-60, 60); e.vy -= rand(30, 90); }
+      if (this.pulse % 5 === 0) for (const c of g.critters) if (c.alive && c !== this.owner) hurt(c, 3);
+      for (let k = 0; k < 2; k++) { const x = rand(40, CFG.W - 40); let y = Terrain.cavern ? 40 : 0; while (y < g.waterY && !Terrain.solid(x, y)) y += 4; if (y < g.waterY) { Terrain.carve(x, y + 3, rand(5, 9)); dustFx(x, y, 3); } }
+      if (this.pulse % 3 === 0) Sfx.rumble();
+    }
+    if (this.t > 3) this.dead = true;
   }
 }
 // Acorn Mortar: fires a three-shell burst along the same arc
@@ -1466,6 +1543,16 @@ function fireCharged(c) {
   const d = aimVec(c), sp = Math.max(0.06, g.power) * CFG.MAX_POWER, id = g.weapon;
   const sx = c.x + d.x * (c.r + 5), sy = c.y + d.y * (c.r + 5);
   if (id === 'mortar') { spawn(new Burst(c, d.x * sp, d.y * sp)); useAmmo(id); afterFire(); return; }
+  if (id === 'cannon') {   // fire yourself: a tool, so the turn carries on after landing
+    c.release(); c.mode = 'air'; c.vx = d.x * sp * 0.95; c.vy = d.y * sp * 0.95 - 40; c.fallDmg = false; c.tumble = false; c.flipV = -c.facing * 9; c.y -= 2; c.squash = -0.3;
+    g.charging = false; useAmmo(id); Sfx.boom(30); shake(8); P({ kind: 'flash', x: sx, y: sy, r: 18, life: 0.12 });
+    for (let i = 0; i < 10; i++) P({ kind: 'smoke', x: sx, y: sy, vx: d.x * rand(40, 160) + rand(-40, 40), vy: d.y * rand(40, 160) + rand(-40, 40), g: -20, drag: 0.93, size: rand(4, 8), life: 0.7 });
+    c.speak(pick(['Wheee!', 'Fire in the hole!', 'Catapult me!'])); return;
+  }
+  if (id === 'spitter') {
+    for (let i = -1; i <= 1; i++) { const a = Math.atan2(d.y, d.x) + i * 0.14, k = 1 + i * 0.06; const p = spawn(new Proj('seed', sx, sy, Math.cos(a) * sp * k, Math.sin(a) * sp * k, { owner: c })); if (!i) g.focus = p; }
+    useAmmo(id); afterFire(); Sfx.shot(); c.speak('Ptoo ptoo ptoo!'); return;
+  }
   const p = spawn(new Proj(id, sx, sy, d.x * sp, d.y * sp, { owner: c, fuse: id === 'bomb' ? g.fuse : undefined, target: g.target }));
   g.focus = p; useAmmo(id); afterFire();
   if (id === 'rocket') Sfx.rocket(); else Sfx.whoosh();
@@ -1482,6 +1569,14 @@ function fireInstant(c, id) {
       if (g.shotsLeft === 0) afterFire();
       break;
     case 'kazoo': kazoo(c); useAmmo(id); afterFire(); break;
+    case 'zap': chainLightning(c); useAmmo(id); afterFire(); break;
+    case 'freeze': freezeRay(c); useAmmo(id); afterFire(); break;
+    case 'quake':
+      if (c.mode !== 'ground') return;
+      spawn(new Quake(c)); useAmmo(id); afterFire(); c.speak(pick(['Rumble time!', 'Hold on to something!'])); break;
+    case 'flood':
+      g.waterTarget = Math.max(400, g.waterTarget - 60); useAmmo(id); afterFire(); banner('The water is rising!', '#8ecae6'); Sfx.splash(); c.speak(pick(['Glub glub!', 'Everybody out of the pool!'])); break;
+    case 'karma': karmaJar(c); useAmmo(id); afterFire(); break;
     case 'slap': fishSlap(c); useAmmo(id); afterFire(); break;
     case 'rifle': shootRifle(c); useAmmo(id); afterFire(); break;
     case 'sunbeam': sunbeam(c); useAmmo(id); afterFire(); break;
@@ -1598,6 +1693,64 @@ function fishSlap(c) {
   if (!hit) addText(c.x, c.y - 30, 'whiff!', '#fff', 14, 1);
 }
 
+// Shared hitscan: walks the aim ray and reports what it met first (critter `o`, object `e`, or solid ground)
+function castRay(c, len, step = 2) {
+  const d = aimVec(c); let x = c.x + d.x * (c.r + 2), y = c.y + d.y * (c.r + 2); const x0 = x, y0 = y;
+  for (let i = 0; i < len / step; i++) {
+    x += d.x * step; y += d.y * step;
+    for (const o of g.critters) if (o.alive && o !== c && (o.x - x) ** 2 + (o.y - y) ** 2 < (o.r + 1) ** 2) return { x0, y0, x, y, o, d };
+    for (const e of g.ents) if (e.onBlast && !(e instanceof Critter) && !e.dead && e.r && (e.x - x) ** 2 + (e.y - y) ** 2 < e.r * e.r) return { x0, y0, x, y, e, d };
+    if (Terrain.solid(x, y)) return { x0, y0, x, y, solid: true, d };
+    if (x < 0 || x > CFG.W || y > g.waterY || y < -400) break;
+  }
+  return { x0, y0, x, y, d };
+}
+function boltFx(x1, y1, x2, y2, jag = 10) {
+  const pts = [], n = 7;
+  for (let i = 0; i <= n; i++) { const k = i / n, j = i && i < n ? 1 : 0; pts.push([lerp(x1, x2, k) + rand(-jag, jag) * j, lerp(y1, y2, k) + rand(-jag, jag) * j]); }
+  P({ kind: 'bolt', pts, x: x2, y: y2, life: 0.35 });
+}
+// Static Jar: lightning that jumps from the first victim to anyone standing close by
+function chainLightning(c) {
+  const h = castRay(c, 700); Sfx.thunder(); shake(5); boltFx(h.x0, h.y0, h.x, h.y);
+  if (h.e) h.e.onBlast(1, h.d.x, h.d.y, 30);
+  if (h.solid) explode(h.x, h.y, 8, 4, { knock: 0.2 });
+  if (!h.o) { if (!h.e && !h.solid) addText(h.x, h.y - 10, 'fizzle', '#cfe6ff', 14, 1); return; }
+  const hit = [h.o]; let cur = h.o;
+  hurt(cur, 24); cur.vx += h.d.x * 120; cur.vy -= 120; cur.knocked(); cur.face = 2; cur.faceT = 1;
+  for (let j = 0; j < 3; j++) {
+    let next = null, nd = 120;
+    for (const o of g.critters) if (o.alive && o !== c && !hit.includes(o)) { const d = Math.hypot(o.x - cur.x, o.y - cur.y); if (d < nd) { nd = d; next = o; } }
+    if (!next) break;
+    boltFx(cur.x, cur.y, next.x, next.y, 8); hurt(next, 16); next.vx += (Math.sign(next.x - cur.x) || 1) * 90; next.vy -= 110; next.knocked(); next.face = 2; next.faceT = 0.8;
+    hit.push(next); cur = next;
+  }
+  if (hit.length > 1) addText(cur.x, cur.y - 30, `${hit.length}× chain!`, '#cfe6ff', 18);
+}
+// Freeze Ray: the first critter hit is encased in ice and skips its next turn
+function freezeRay(c) {
+  const h = castRay(c, 650); Sfx.laser(); shake(2);
+  P({ kind: 'beam', x: h.x0, y: h.y0, x2: h.x, y2: h.y, life: 0.4, col: '#9ad7ff' });
+  for (let k = 0; k < 12; k++) { const t = rand(0, 1); P({ kind: 'spark', x: lerp(h.x0, h.x, t), y: lerp(h.y0, h.y, t), vx: rand(-30, 30), vy: rand(-40, 10), g: 0, drag: 0.95, size: 2, life: 0.5, col: '#cfe6ff' }); }
+  if (!h.o) { addText(h.x, h.y - 10, 'miss!', '#cfe6ff', 14, 1); return; }
+  const o = h.o;
+  o.frozen = 2; o.release(); o.vx = o.vy = 0; o.tumble = false; o.spin = 0; o.sadT = 0; o.face = 0; o.faceT = 0;
+  if (circleHits(o.x, o.y + 2, o.r)) o.land(0);
+  o.speak(pick(['B-b-brrr!', 'So c-cold!', 'Ice ice baby.'])); addText(o.x, o.y - 30, 'FROZEN!', '#9ad7ff', 20); Sfx.tone(900, 0.3, 'sine', 0.1, 300);
+  for (let i = 0; i < 14; i++) P({ kind: 'spark', x: o.x, y: o.y, vx: rand(-100, 100), vy: rand(-100, 100), g: 0, drag: 0.9, size: 2, life: 0.6, col: '#fff' });
+}
+// Karma Jar: everyone alive gets the average HP
+function karmaJar(c) {
+  const alive = g.critters.filter(o => o.alive); if (!alive.length) return;
+  const avg = Math.max(1, Math.round(alive.reduce((a, o) => a + Math.max(0, o.hp - o.pending), 0) / alive.length));
+  for (const o of alive) {
+    const diff = avg - (o.hp - o.pending); o.hp = avg; o.pending = 0;
+    addText(o.x, o.y - 30, (diff >= 0 ? '+' : '') + diff, diff >= 0 ? '#7CFC9a' : '#ff6b6b', 18);
+    for (let i = 0; i < 10; i++) P({ kind: 'spark', x: o.x, y: o.y, vx: rand(-90, 90), vy: rand(-140, -20), g: 200, drag: 0.95, size: 2, life: 0.7, col: '#ffe066' });
+  }
+  Sfx.teleport(); shake(4); banner(`Karma! Everyone is at ${avg} HP`, '#ffe066'); c.speak(pick(['Fair is fair.', 'Share and share alike!']));
+}
+
 function kazoo(c) {
   const d = aimVec(c), ang = Math.atan2(d.y, d.x);
   Sfx.kazoo();
@@ -1638,6 +1791,13 @@ function doClickAction(c, id, wx, wy) {
     case 'anvil': g.focus = spawn(new Anvil(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak('Look up!'); break;
     case 'thunder': g.focus = spawn(new Cloud(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak(pick(['Thunder!', 'Zap zap!'])); break;
     case 'shower': g.focus = spawn(new Shower(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak('Make a wish!'); break;
+    case 'balloon': {
+      let best = null, bd = 40;
+      for (const o of g.critters) if (o.alive) { const d = Math.hypot(o.x - wx, o.y - wy); if (d < bd) { bd = d; best = o; } }
+      if (!best) { banner('Click on a critter to tie the balloon to!'); return; }
+      if (best.frozen > 0) { banner("That one's frozen to the ground!"); return; }
+      g.focus = spawn(new Balloon(best)); best.speak(best === c ? pick(['Up, up and away!', 'Bye!']) : pick(['Wha–?!', 'Put me down!', 'Not again!'])); Sfx.whoosh(); useAmmo(id); afterFire(); break;
+    }
     case 'swap': {
       let best = null, bd = 40;
       for (const o of g.critters) if (o.alive && o !== c) { const d = Math.hypot(o.x - wx, o.y - wy); if (d < bd) { bd = d; best = o; } }
@@ -1807,6 +1967,47 @@ function drawIcon(x, id, s) {
       x.beginPath(); x.moveTo(-14, -6); x.lineTo(10, -6); x.moveTo(5, -11); x.lineTo(10, -6); x.lineTo(5, -1); x.stroke();
       x.beginPath(); x.moveTo(14, 7); x.lineTo(-10, 7); x.moveTo(-5, 2); x.lineTo(-10, 7); x.lineTo(-5, 12); x.stroke();
       x.strokeStyle = '#3a86ff'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(-14, -6); x.lineTo(10, -6); x.stroke(); x.strokeStyle = '#ff4d6d'; x.beginPath(); x.moveTo(14, 7); x.lineTo(-10, 7); x.stroke(); x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; break;
+    case 'frog':
+      x.beginPath(); x.ellipse(0, 4, 15, 10, 0, 0, 7); fs(x, '#59b84a');
+      circ(x, -7, -7, 5); fs(x, '#59b84a'); circ(x, 7, -7, 5); fs(x, '#59b84a');
+      x.fillStyle = '#fff'; circ(x, -7, -7, 3); x.fill(); circ(x, 7, -7, 3); x.fill(); x.fillStyle = '#111'; circ(x, -6, -7, 1.5); x.fill(); circ(x, 8, -7, 1.5); x.fill();
+      x.beginPath(); x.moveTo(-8, 6); x.quadraticCurveTo(0, 12, 8, 6); x.stroke();
+      x.beginPath(); x.moveTo(-14, 10); x.lineTo(-20, 16); x.moveTo(14, 10); x.lineTo(20, 16); x.stroke(); break;
+    case 'zap':
+      rr(x, -11, -6, 22, 22, 4); fs(x, '#bde0fe'); rr(x, -8, -14, 16, 8, 2); fs(x, '#9aa3ad');
+      x.beginPath(); x.moveTo(3, -2); x.lineTo(-4, 5); x.lineTo(1, 5); x.lineTo(-3, 13); x.lineTo(5, 3); x.lineTo(0, 3); x.lineTo(4, -2); x.closePath(); fs(x, '#ffd23f'); break;
+    case 'freeze':
+      rr(x, -16, -4, 24, 8, 3); fs(x, '#7fc8f8'); rr(x, -10, 4, 8, 10, 2); fs(x, '#5a6b8c'); circ(x, 10, 0, 6); fs(x, '#bde0fe');
+      x.strokeStyle = '#fff'; x.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { const a = i * 1.047; x.beginPath(); x.moveTo(19 - Math.cos(a) * 7, -Math.sin(a) * 7); x.lineTo(19 + Math.cos(a) * 7, Math.sin(a) * 7); x.stroke(); }
+      x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; break;
+    case 'balloon':
+      x.beginPath(); x.ellipse(0, -5, 12, 14, 0, 0, 7); fs(x, '#ff5d8f'); x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.ellipse(-4, -10, 3.5, 5, -0.4, 0, 7); x.fill();
+      x.beginPath(); x.moveTo(-3, 9); x.lineTo(3, 9); x.lineTo(0, 12); x.closePath(); fs(x, '#ff5d8f');
+      x.lineWidth = 1.5; x.beginPath(); x.moveTo(0, 12); x.quadraticCurveTo(6, 16, 2, 22); x.stroke(); x.lineWidth = 2.5; break;
+    case 'quake':
+      x.beginPath(); x.moveTo(-20, 12); x.lineTo(-10, -4); x.lineTo(-2, 6); x.lineTo(6, -8); x.lineTo(14, 2); x.lineTo(20, 12); x.closePath(); fs(x, '#8d5a2b');
+      x.lineWidth = 2; x.beginPath(); x.moveTo(-6, 12); x.lineTo(-2, 2); x.lineTo(2, 8); x.lineTo(5, 0); x.stroke();
+      x.strokeStyle = '#ffd23f'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(-24, -2); x.lineTo(-28, -8); x.moveTo(24, -2); x.lineTo(28, -8); x.moveTo(-26, 14); x.lineTo(-30, 16); x.stroke(); x.strokeStyle = '#2b1d12'; break;
+    case 'flood':
+      x.fillStyle = '#4ea8de'; x.beginPath(); x.moveTo(-20, 14); for (let i = -20; i <= 20; i += 2) x.lineTo(i, 2 + Math.sin(i * 0.4) * 3); x.lineTo(20, 14); x.closePath(); x.fill(); x.stroke();
+      x.beginPath(); x.moveTo(0, -18); x.quadraticCurveTo(9, -5, 0, -2); x.quadraticCurveTo(-9, -5, 0, -18); x.closePath(); fs(x, '#4ea8de');
+      x.beginPath(); x.moveTo(-14, -8); x.lineTo(-14, -16); x.moveTo(-17, -13); x.lineTo(-14, -16); x.lineTo(-11, -13); x.stroke(); break;
+    case 'spitter':
+      x.beginPath(); x.moveTo(-18, 4); x.lineTo(-8, 0); x.lineTo(-4, 10); x.lineTo(-14, 14); x.closePath(); fs(x, '#8d5a2b');
+      rr(x, -10, -4, 26, 7, 3); fs(x, '#3b3b45'); circ(x, 18, -1, 4); fs(x, '#3b3b45');
+      x.fillStyle = '#ff2a2a'; circ(x, 18, -1, 1.5); x.fill(); x.fillStyle = '#3b3b45';
+      for (const [sx, sy] of [[8, -12], [14, -17], [2, -17]]) { x.beginPath(); x.ellipse(sx, sy, 3, 2.2, 0, 0, 7); x.fill(); x.stroke(); } break;
+    case 'karma':
+      rr(x, -11, -8, 22, 24, 5); fs(x, 'rgba(200,230,255,0.9)'); rr(x, -8, -14, 16, 7, 2); fs(x, '#a0703f');
+      x.beginPath(); x.moveTo(-5, -1); x.lineTo(5, 9); x.moveTo(5, -1); x.lineTo(-5, 9); x.stroke();
+      circ(x, 0, 4, 3); fs(x, '#ffd23f'); break;
+    case 'cannon':
+      x.save(); x.rotate(-0.5); rr(x, -6, -20, 14, 28, 4); fs(x, '#5c6670'); rr(x, -8, -22, 18, 6, 2); fs(x, '#9aa3ad'); x.restore();
+      circ(x, 0, 10, 6); fs(x, '#3b3b45'); circ(x, 14, -16, 5); fs(x, '#b5814f'); x.fillStyle = '#fff'; circ(x, 13, -17, 1.8); x.fill(); circ(x, 16, -17, 1.8); x.fill();
+      x.strokeStyle = '#ffd23f'; x.beginPath(); x.moveTo(20, -22); x.lineTo(26, -28); x.moveTo(22, -16); x.lineTo(28, -16); x.stroke(); x.strokeStyle = '#2b1d12'; break;
+    case 'seed':
+      x.beginPath(); x.ellipse(0, 0, 7, 10, 0.3, 0, 7); fs(x, '#3b3b45'); x.fillStyle = '#ff2a2a'; circ(x, 1, -2, 2); x.fill(); break;
     case 'meteor':
       circ(x, 0, 0, 11); fs(x, '#5a4a4a'); x.fillStyle = '#ff9f1c'; circ(x, -3, -3, 3); x.fill(); x.fillStyle = '#8a7a7a'; circ(x, 4, 3, 2.5); x.fill(); break;
     case 'egg':
@@ -1870,13 +2071,20 @@ function* aiPlan(c) {
     if (has('chili') && d < 120) consider({ w: 'chili', facing, angle, tx: e.x, score: 24 - d * 0.05 });
     if (has('stomp') && d < 140 && c.mode === 'ground') consider({ w: 'stomp', facing, angle: c.aim, tx: e.x, score: 10 + (1 - d / 150) * 14 + (willFall(e.x + facing * 60, e.y) ? 40 : 0) });
     if (has('shower')) consider({ w: 'shower', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: scoreBlast(c, e.x, e.y, 130, 30) * 0.9 + 6 });
+    if (has('zap') && d < 680 && lineClear(c.x, c.y, e.x, e.y)) { let extra = 0; for (const o of g.critters) if (o.alive && o !== e && o !== c && Math.hypot(o.x - e.x, o.y - e.y) < 120) extra += o.team !== team ? 14 : -14; consider({ w: 'zap', facing, angle, tx: e.x, score: Math.min(24, e.hp - e.pending) + extra + 2 }); }
+    if (has('freeze') && d < 630 && e.frozen <= 0 && lineClear(c.x, c.y, e.x, e.y)) consider({ w: 'freeze', facing, angle, tx: e.x, score: 10 + Math.min(30, e.hp - e.pending) * 0.3 });
+    if (has('balloon') && e.frozen <= 0) consider({ w: 'balloon', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: 16 + Math.abs(g.wind) * 18 + (willFall(e.x + Math.sign(g.wind || 1) * 300, e.y) ? 30 : 0) });
     if (has('rifle') && d < 1100 && lineClear(c.x, c.y, e.x, e.y)) consider({ w: 'rifle', facing, angle, tx: e.x, score: Math.min(38, e.hp - e.pending) + (willFall(e.x + facing * 30, e.y) ? 15 : 0) + (e.hp - e.pending <= 38 ? 25 : 0) - d * 0.005 });
   }
+  // map-wide weapons: judged on the whole board rather than one enemy
+  if (has('quake') && c.mode === 'ground') { let s = 6; for (const o of g.critters) if (o.alive && o !== c) { const edge = willFall(o.x + 30, o.y) || willFall(o.x - 30, o.y); s += o.team !== team ? 3 + (edge ? 22 : 0) : -(3 + (edge ? 30 : 0)); } consider({ w: 'quake', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
+  if (has('flood')) { let s = -4; for (const o of g.critters) if (o.alive && o.y > g.waterY - 75) s += o.team !== team ? 70 : -90; consider({ w: 'flood', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
+  if (has('karma')) { const alive = g.critters.filter(o => o.alive), avg = alive.reduce((a, o) => a + o.hp - o.pending, 0) / alive.length, mine = alive.filter(o => o.team === team), myAvg = mine.reduce((a, o) => a + o.hp - o.pending, 0) / mine.length; if (myAvg < avg - 12) consider({ w: 'karma', facing: c.facing, angle: c.aim, tx: c.x, score: (avg - myAvg) * mine.length * 0.7 }); }
   yield;
   // Brute-force trajectory search: sweep aim angle × launch power for each ballistic weapon,
   // simulate, and score the detonation point. Spread across frames via `yield`.
-  const ballistic = ['rocket', 'bomb', 'melon', 'skunk', 'acorn', 'mortar', 'vortex'].filter(has);
-  const RD = { rocket: [50, 50], bomb: [48, 48], melon: [58, 50], skunk: [60, 32], acorn: [95, 90], mortar: [40, 50], vortex: [120, 26] };
+  const ballistic = ['rocket', 'bomb', 'melon', 'skunk', 'acorn', 'mortar', 'vortex', 'frog'].filter(has);
+  const RD = { rocket: [50, 50], bomb: [48, 48], melon: [58, 50], skunk: [60, 32], acorn: [95, 90], mortar: [40, 50], vortex: [120, 26], frog: [75, 40] };
   let n = 0;
   for (const w of ballistic) for (const facing of [-1, 1]) for (let a = -1.45; a <= 0.75; a += 0.08) for (let p = 0.2; p <= 1.001; p += 0.05) {
     const imp = simulateShot(c, w, facing, a, p);
@@ -1889,6 +2097,7 @@ function* aiPlan(c) {
       if (w === 'acorn') s += 4;
       if (w === 'mortar') s -= 3;
       if (w === 'vortex') s -= 10;
+      if (w === 'frog') s -= 4;
       consider({ w, facing, angle: a, power: p, score: s, tx: imp.x, ty: imp.y, fuse: 3 });
     }
     if (++n % 24 === 0) yield;
@@ -2295,6 +2504,11 @@ function drawCritter(x, c, t) {
   else { x.arc(r * 0.55, r * 0.3, 2.6, 0.2, Math.PI - 0.2); x.stroke(); }
   // sweat drop when struggling against a wall or badly hurt
   if ((c.blocked && wk > 0.5) || (lowHp && Math.sin(t * 1.1 + c.seed) > 0.6)) { x.fillStyle = '#9ad7ff'; x.beginPath(); x.ellipse(r * 0.95, -r * 0.75 + (t * 10 % 6), 1.3, 2, 0, 0, 7); x.fill(); }
+  // frozen: a block of ice around the whole critter
+  if (c.frozen > 0) {
+    x.globalAlpha = 0.55; x.fillStyle = '#bfe9ff'; x.strokeStyle = '#6cc3ff'; x.lineWidth = 1.5; rr(x, -r * 1.5, -r * 1.75, r * 3, r * 3.3, 3); x.fill(); x.stroke();
+    x.globalAlpha = 0.9; x.strokeStyle = '#fff'; x.lineWidth = 1; x.beginPath(); x.moveTo(-r * 1.2, -r * 1.4); x.lineTo(-r * 0.5, -r * 0.5); x.moveTo(r * 0.8, r * 0.3); x.lineTo(r * 1.3, r * 1.2); x.stroke(); x.globalAlpha = 1;
+  }
   // dizzy stars circling the head
   if (face === 2) {
     x.fillStyle = '#ffe066'; x.strokeStyle = '#8a6a00'; x.lineWidth = 0.6;
@@ -2313,6 +2527,7 @@ function drawEntity(x, e, t) {
     else if (ty === 'bee') { x.scale(e.vx < 0 ? -1 : 1, 1); drawIcon(x, 'bee', 14 + Math.sin(t * 40)); }
     else if (ty === 'sticky') { drawIcon(x, 'sticky', 13); if (e.armT <= 0 && (e.trigT >= 0 ? (t * 8 | 0) % 2 : (t * 2 | 0) % 2)) { x.fillStyle = '#ff2'; circ(x, 0, -1, 2); x.fill(); } }
     else if (ty === 'boomerang') { x.rotate(t * 22); drawIcon(x, 'boomerang', 14); }
+    else if (ty === 'frog') { x.scale(e.vx < 0 ? -1 : 1, 1); if (e.rest) x.scale(1.15, 0.85); else x.scale(0.92, 1.12); drawIcon(x, 'frog', 15); }
     else if (ty === 'shell') { x.rotate(Math.atan2(e.vy, e.vx) + Math.PI / 2); drawIcon(x, 'acorn', 7); }
     else if (ty === 'meteor') { x.rotate(e.spin); drawIcon(x, 'meteor', 13); }
     else { x.rotate(e.spin); drawIcon(x, ty === 'frag' ? 'frag' : ty, ty === 'melon' ? 15 : ty === 'frag' ? 8 : ty === 'acorn' ? 22 : ty === 'skunk' ? 14 : ty === 'bowling' ? 17 : ty === 'vortex' ? 13 : 12); }
@@ -2355,6 +2570,14 @@ function drawEntity(x, e, t) {
   } else if (e instanceof Shower) {
     x.restore(); x.save();
     if (e.n < 7) { const sx = e.x, sy = Math.max(cam.y - view.h / 2 / cam.zoom + 30, 40); x.fillStyle = `rgba(255,210,63,${0.5 + 0.5 * Math.sin(t * 12)})`; x.font = 'bold 22px sans-serif'; x.textAlign = 'center'; x.fillText('★ ★ ★', sx, sy); }
+  } else if (e instanceof Balloon) {
+    const c = e.c; x.strokeStyle = '#2b1d12'; x.lineWidth = 1;
+    if (c) { x.beginPath(); x.moveTo(0, 12); x.lineTo(c.x - e.x, c.y - e.y - 6); x.stroke(); }
+    x.fillStyle = '#ff5d8f'; x.lineWidth = 1.5; x.beginPath(); x.ellipse(0, 0, 10, 12, 0, 0, 7); x.fill(); x.stroke();
+    x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.ellipse(-3, -4, 3, 4, -0.4, 0, 7); x.fill();
+    x.fillStyle = '#ff5d8f'; x.beginPath(); x.moveTo(-3, 11); x.lineTo(3, 11); x.lineTo(0, 14); x.closePath(); x.fill(); x.stroke();
+  } else if (e instanceof Quake) {
+    // the shaking camera and crumbling ground are the show
   } else if (e instanceof GasPuff) {
     const a = clamp(e.life < 1 ? e.life : 1, 0, 1) * 0.55, r = e.r || 10;
     x.fillStyle = `rgba(120,200,40,${a})`; circ(x, 0, 0, r); x.fill();
@@ -2409,7 +2632,7 @@ function drawParticles(x) {
         case 'note': x.globalAlpha = a; x.fillStyle = p.col; x.font = `bold ${p.size | 0}px sans-serif`; x.fillText('♪', p.x, p.y); break;
         case 'icon': x.globalAlpha = Math.min(1, a * 2); x.save(); x.translate(p.x, p.y); x.rotate((p.rot || 0) + (p.vr || 0) * p.t); drawIcon(x, p.icon, p.size); x.restore(); break;
         case 'beam': x.globalAlpha = a; x.lineCap = 'round';
-          for (const [wdt, col] of [[14, 'rgba(255,200,80,0.35)'], [6, '#ffd23f'], [2, '#fff']]) { x.strokeStyle = col; x.lineWidth = wdt * (1 - k * 0.6); x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(p.x2, p.y2); x.stroke(); } break;
+          for (const [wdt, col] of (p.col ? [[14, 'rgba(150,215,255,0.35)'], [6, p.col], [2, '#fff']] : [[14, 'rgba(255,200,80,0.35)'], [6, '#ffd23f'], [2, '#fff']])) { x.strokeStyle = col; x.lineWidth = wdt * (1 - k * 0.6); x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(p.x2, p.y2); x.stroke(); } break;
         case 'bolt': x.globalAlpha = a; x.lineCap = 'round'; x.lineJoin = 'round';
           for (const [wdt, col] of [[9, 'rgba(140,190,255,0.45)'], [4, '#cfe6ff'], [1.5, '#fff']]) { x.strokeStyle = col; x.lineWidth = wdt; x.beginPath(); p.pts.forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke(); } break;
       }
@@ -2839,8 +3062,13 @@ function resolveMap(m) { return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
 function resolveTheme(t) { return THEMES[t] ? t : pick(THEME_NAMES); }
 function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)); }
 
+function thaw(o) {
+  o.frozen = 0; addText(o.x, o.y - 30, 'thawed!', '#9ad7ff', 16); Sfx.clack(); o.speak(pick(['Phew.', 'F-feeling again.']));
+  for (let i = 0; i < 12; i++) P({ kind: 'spark', x: o.x + rand(-10, 10), y: o.y + rand(-12, 8), vx: rand(-120, 120), vy: rand(-160, -20), g: 400, drag: 0.96, size: 2.5, life: 0.6, col: '#cfe6ff' });
+}
 function hurt(c, amt) {
   if (!c.alive || amt <= 0) return;
+  if (c.frozen > 0) amt = Math.ceil(amt / 2);
   c.pending += amt; c.hurtT = 0.9;
   if (amt >= 25 || c.hp - c.pending <= 0) { c.face = 2; c.faceT = 1.7; } else if (c.faceT <= 0 || c.face === 1) { c.face = 1; c.faceT = 0.9; }   // 2 = dizzy, 1 = ouch
   const at = g.active && g.active.team; if (at && at !== c.team) at.dmg += amt;   // credit the team whose turn it is
@@ -2868,9 +3096,15 @@ function startTurn() {
   let ti = g.teamIdx;
   for (let k = 0; k < g.teams.length; k++) { ti = (ti + 1) % g.teams.length; if (g.teams[ti].critters.some(c => c.alive)) break; }
   g.teamIdx = ti; const team = g.teams[ti];
-  let ci = team.cIdx;
-  for (let k = 0; k < team.critters.length; k++) { ci = (ci + 1) % team.critters.length; if (team.critters[ci].alive) break; }
-  team.cIdx = ci; const c = team.critters[ci];
+  // ice lasts two of this team's turns; frozen critters are skipped in the rotation
+  for (const o of team.critters) if (o.alive && o.frozen > 0) { o.frozen--; if (o.frozen > 0) addText(o.x, o.y - 30, 'still frozen', '#9ad7ff', 14); else thaw(o); }
+  let ci = team.cIdx, c = null;
+  for (let k = 0; k < team.critters.length; k++) {
+    ci = (ci + 1) % team.critters.length; const o = team.critters[ci];
+    if (o.alive && o.frozen <= 0) { c = o; break; }
+  }
+  team.cIdx = ci;
+  if (!c) { banner(`${team.name} is frozen solid – turn lost!`, team.color); return startTurn(); }   // every critter on ice: skip the team
   if (!g.sd && g.settings.sdMinutes > 0 && g.time > g.settings.sdMinutes * 60) {
     g.sd = true; for (const o of g.critters) if (o.alive) { o.hp = 1; o.pending = 0; }
     banner('SUDDEN DEATH! Everyone is at 1 HP!', '#ff4d6d'); shake(10); Sfx.sad();
@@ -2948,6 +3182,7 @@ function updateResolving(dt) {
     case 'post':
       if (teamsAlive().length <= 1) { gameOver(); break; }
       if (g.sd && !g.waterDone) { g.waterDone = true; g.waterTarget -= 22; g.phase = 'water'; banner('The water is rising!', '#8ecae6'); break; }
+      if (Math.abs(g.waterY - g.waterTarget) > 0.5) { g.phase = 'water'; break; }   // a Flood is still rising
       if (!g.crateDone) { g.crateDone = true; if (spawnCrates()) { g.phase = 'settle'; g.quietT = 0; break; } }
       startTurn();
       break;
@@ -3293,13 +3528,13 @@ const Net = {
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };
-const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT'];
+const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT', 'frozen'];
 const NET_KINDS = [
   ['P', Proj, ['type', 'spin', 'fuseT', 'armT', 'trigT', 'stuck']], ['M', Mine, ['trigT', 'spent', 'blink']], ['B', Barrel, ['fuseT']],
   ['C', Crate, ['type', 'chute', 'sway']], ['G', Grave, ['col']], ['L', Lava, ['life', 'stuck']], ['V', Volcano, ['t']],
   ['R', Robot, ['dir', 'legPh', 't']], ['A', Anvil, []], ['E', Pelican, ['dir', 'flap']], ['H', Rope, ['cId', 'tx', 'ty', 'state']],
   ['Q', GasPuff, ['life', 'r']], ['T', Cloud, ['t', 'bolts', 'nextT']], ['D', Drill, ['dx', 'dy']],
-  ['X', Vortex, ['t', 'life']], ['S', Shower, ['t', 'n']],
+  ['X', Vortex, ['t', 'life']], ['S', Shower, ['t', 'n']], ['N', Balloon, ['cId', 't', 'popT']], ['K', Quake, ['t']],
 ];
 const NET_KIND = new Map(NET_KINDS.map(([code, cls, f]) => [cls, { code, cls, f }]));
 const NET_CODE = new Map(NET_KINDS.map(([code, cls, f]) => [code, { code, cls, f }]));
@@ -3358,7 +3593,7 @@ function applySnap(s) {
     e._nx = a[2]; e._ny = a[3]; e.vx = a[4]; e.vy = a[5];
     k.f.forEach((f, i) => { e[f] = a[6 + i]; });
     if (k.cls === Proj) Object.assign(e, PROJ[e.type] ? { r: PROJ[e.type].r, fuse: PROJ[e.type].fuse } : {});
-    if (k.cls === Rope) e.c = byId.get(e.cId) || g.critters.find(c => c.id === e.cId);
+    if (k.cls === Rope || k.cls === Balloon) e.c = byId.get(e.cId) || g.critters.find(c => c.id === e.cId);
     ents.push(e);
   }
   g.ents = ents;

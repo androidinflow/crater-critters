@@ -52,8 +52,13 @@ function resolveMap(m) { return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
 function resolveTheme(t) { return THEMES[t] ? t : pick(THEME_NAMES); }
 function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)); }
 
+function thaw(o) {
+  o.frozen = 0; addText(o.x, o.y - 30, 'thawed!', '#9ad7ff', 16); Sfx.clack(); o.speak(pick(['Phew.', 'F-feeling again.']));
+  for (let i = 0; i < 12; i++) P({ kind: 'spark', x: o.x + rand(-10, 10), y: o.y + rand(-12, 8), vx: rand(-120, 120), vy: rand(-160, -20), g: 400, drag: 0.96, size: 2.5, life: 0.6, col: '#cfe6ff' });
+}
 function hurt(c, amt) {
   if (!c.alive || amt <= 0) return;
+  if (c.frozen > 0) amt = Math.ceil(amt / 2);
   c.pending += amt; c.hurtT = 0.9;
   if (amt >= 25 || c.hp - c.pending <= 0) { c.face = 2; c.faceT = 1.7; } else if (c.faceT <= 0 || c.face === 1) { c.face = 1; c.faceT = 0.9; }   // 2 = dizzy, 1 = ouch
   const at = g.active && g.active.team; if (at && at !== c.team) at.dmg += amt;   // credit the team whose turn it is
@@ -81,9 +86,15 @@ function startTurn() {
   let ti = g.teamIdx;
   for (let k = 0; k < g.teams.length; k++) { ti = (ti + 1) % g.teams.length; if (g.teams[ti].critters.some(c => c.alive)) break; }
   g.teamIdx = ti; const team = g.teams[ti];
-  let ci = team.cIdx;
-  for (let k = 0; k < team.critters.length; k++) { ci = (ci + 1) % team.critters.length; if (team.critters[ci].alive) break; }
-  team.cIdx = ci; const c = team.critters[ci];
+  // ice lasts two of this team's turns; frozen critters are skipped in the rotation
+  for (const o of team.critters) if (o.alive && o.frozen > 0) { o.frozen--; if (o.frozen > 0) addText(o.x, o.y - 30, 'still frozen', '#9ad7ff', 14); else thaw(o); }
+  let ci = team.cIdx, c = null;
+  for (let k = 0; k < team.critters.length; k++) {
+    ci = (ci + 1) % team.critters.length; const o = team.critters[ci];
+    if (o.alive && o.frozen <= 0) { c = o; break; }
+  }
+  team.cIdx = ci;
+  if (!c) { banner(`${team.name} is frozen solid – turn lost!`, team.color); return startTurn(); }   // every critter on ice: skip the team
   if (!g.sd && g.settings.sdMinutes > 0 && g.time > g.settings.sdMinutes * 60) {
     g.sd = true; for (const o of g.critters) if (o.alive) { o.hp = 1; o.pending = 0; }
     banner('SUDDEN DEATH! Everyone is at 1 HP!', '#ff4d6d'); shake(10); Sfx.sad();
@@ -161,6 +172,7 @@ function updateResolving(dt) {
     case 'post':
       if (teamsAlive().length <= 1) { gameOver(); break; }
       if (g.sd && !g.waterDone) { g.waterDone = true; g.waterTarget -= 22; g.phase = 'water'; banner('The water is rising!', '#8ecae6'); break; }
+      if (Math.abs(g.waterY - g.waterTarget) > 0.5) { g.phase = 'water'; break; }   // a Flood is still rising
       if (!g.crateDone) { g.crateDone = true; if (spawnCrates()) { g.phase = 'settle'; g.quietT = 0; break; } }
       startTurn();
       break;

@@ -42,6 +42,16 @@ function fireCharged(c) {
   const d = aimVec(c), sp = Math.max(0.06, g.power) * CFG.MAX_POWER, id = g.weapon;
   const sx = c.x + d.x * (c.r + 5), sy = c.y + d.y * (c.r + 5);
   if (id === 'mortar') { spawn(new Burst(c, d.x * sp, d.y * sp)); useAmmo(id); afterFire(); return; }
+  if (id === 'cannon') {   // fire yourself: a tool, so the turn carries on after landing
+    c.release(); c.mode = 'air'; c.vx = d.x * sp * 0.95; c.vy = d.y * sp * 0.95 - 40; c.fallDmg = false; c.tumble = false; c.flipV = -c.facing * 9; c.y -= 2; c.squash = -0.3;
+    g.charging = false; useAmmo(id); Sfx.boom(30); shake(8); P({ kind: 'flash', x: sx, y: sy, r: 18, life: 0.12 });
+    for (let i = 0; i < 10; i++) P({ kind: 'smoke', x: sx, y: sy, vx: d.x * rand(40, 160) + rand(-40, 40), vy: d.y * rand(40, 160) + rand(-40, 40), g: -20, drag: 0.93, size: rand(4, 8), life: 0.7 });
+    c.speak(pick(['Wheee!', 'Fire in the hole!', 'Catapult me!'])); return;
+  }
+  if (id === 'spitter') {
+    for (let i = -1; i <= 1; i++) { const a = Math.atan2(d.y, d.x) + i * 0.14, k = 1 + i * 0.06; const p = spawn(new Proj('seed', sx, sy, Math.cos(a) * sp * k, Math.sin(a) * sp * k, { owner: c })); if (!i) g.focus = p; }
+    useAmmo(id); afterFire(); Sfx.shot(); c.speak('Ptoo ptoo ptoo!'); return;
+  }
   const p = spawn(new Proj(id, sx, sy, d.x * sp, d.y * sp, { owner: c, fuse: id === 'bomb' ? g.fuse : undefined, target: g.target }));
   g.focus = p; useAmmo(id); afterFire();
   if (id === 'rocket') Sfx.rocket(); else Sfx.whoosh();
@@ -58,6 +68,14 @@ function fireInstant(c, id) {
       if (g.shotsLeft === 0) afterFire();
       break;
     case 'kazoo': kazoo(c); useAmmo(id); afterFire(); break;
+    case 'zap': chainLightning(c); useAmmo(id); afterFire(); break;
+    case 'freeze': freezeRay(c); useAmmo(id); afterFire(); break;
+    case 'quake':
+      if (c.mode !== 'ground') return;
+      spawn(new Quake(c)); useAmmo(id); afterFire(); c.speak(pick(['Rumble time!', 'Hold on to something!'])); break;
+    case 'flood':
+      g.waterTarget = Math.max(400, g.waterTarget - 60); useAmmo(id); afterFire(); banner('The water is rising!', '#8ecae6'); Sfx.splash(); c.speak(pick(['Glub glub!', 'Everybody out of the pool!'])); break;
+    case 'karma': karmaJar(c); useAmmo(id); afterFire(); break;
     case 'slap': fishSlap(c); useAmmo(id); afterFire(); break;
     case 'rifle': shootRifle(c); useAmmo(id); afterFire(); break;
     case 'sunbeam': sunbeam(c); useAmmo(id); afterFire(); break;
@@ -174,6 +192,64 @@ function fishSlap(c) {
   if (!hit) addText(c.x, c.y - 30, 'whiff!', '#fff', 14, 1);
 }
 
+// Shared hitscan: walks the aim ray and reports what it met first (critter `o`, object `e`, or solid ground)
+function castRay(c, len, step = 2) {
+  const d = aimVec(c); let x = c.x + d.x * (c.r + 2), y = c.y + d.y * (c.r + 2); const x0 = x, y0 = y;
+  for (let i = 0; i < len / step; i++) {
+    x += d.x * step; y += d.y * step;
+    for (const o of g.critters) if (o.alive && o !== c && (o.x - x) ** 2 + (o.y - y) ** 2 < (o.r + 1) ** 2) return { x0, y0, x, y, o, d };
+    for (const e of g.ents) if (e.onBlast && !(e instanceof Critter) && !e.dead && e.r && (e.x - x) ** 2 + (e.y - y) ** 2 < e.r * e.r) return { x0, y0, x, y, e, d };
+    if (Terrain.solid(x, y)) return { x0, y0, x, y, solid: true, d };
+    if (x < 0 || x > CFG.W || y > g.waterY || y < -400) break;
+  }
+  return { x0, y0, x, y, d };
+}
+function boltFx(x1, y1, x2, y2, jag = 10) {
+  const pts = [], n = 7;
+  for (let i = 0; i <= n; i++) { const k = i / n, j = i && i < n ? 1 : 0; pts.push([lerp(x1, x2, k) + rand(-jag, jag) * j, lerp(y1, y2, k) + rand(-jag, jag) * j]); }
+  P({ kind: 'bolt', pts, x: x2, y: y2, life: 0.35 });
+}
+// Static Jar: lightning that jumps from the first victim to anyone standing close by
+function chainLightning(c) {
+  const h = castRay(c, 700); Sfx.thunder(); shake(5); boltFx(h.x0, h.y0, h.x, h.y);
+  if (h.e) h.e.onBlast(1, h.d.x, h.d.y, 30);
+  if (h.solid) explode(h.x, h.y, 8, 4, { knock: 0.2 });
+  if (!h.o) { if (!h.e && !h.solid) addText(h.x, h.y - 10, 'fizzle', '#cfe6ff', 14, 1); return; }
+  const hit = [h.o]; let cur = h.o;
+  hurt(cur, 24); cur.vx += h.d.x * 120; cur.vy -= 120; cur.knocked(); cur.face = 2; cur.faceT = 1;
+  for (let j = 0; j < 3; j++) {
+    let next = null, nd = 120;
+    for (const o of g.critters) if (o.alive && o !== c && !hit.includes(o)) { const d = Math.hypot(o.x - cur.x, o.y - cur.y); if (d < nd) { nd = d; next = o; } }
+    if (!next) break;
+    boltFx(cur.x, cur.y, next.x, next.y, 8); hurt(next, 16); next.vx += (Math.sign(next.x - cur.x) || 1) * 90; next.vy -= 110; next.knocked(); next.face = 2; next.faceT = 0.8;
+    hit.push(next); cur = next;
+  }
+  if (hit.length > 1) addText(cur.x, cur.y - 30, `${hit.length}× chain!`, '#cfe6ff', 18);
+}
+// Freeze Ray: the first critter hit is encased in ice and skips its next turn
+function freezeRay(c) {
+  const h = castRay(c, 650); Sfx.laser(); shake(2);
+  P({ kind: 'beam', x: h.x0, y: h.y0, x2: h.x, y2: h.y, life: 0.4, col: '#9ad7ff' });
+  for (let k = 0; k < 12; k++) { const t = rand(0, 1); P({ kind: 'spark', x: lerp(h.x0, h.x, t), y: lerp(h.y0, h.y, t), vx: rand(-30, 30), vy: rand(-40, 10), g: 0, drag: 0.95, size: 2, life: 0.5, col: '#cfe6ff' }); }
+  if (!h.o) { addText(h.x, h.y - 10, 'miss!', '#cfe6ff', 14, 1); return; }
+  const o = h.o;
+  o.frozen = 2; o.release(); o.vx = o.vy = 0; o.tumble = false; o.spin = 0; o.sadT = 0; o.face = 0; o.faceT = 0;
+  if (circleHits(o.x, o.y + 2, o.r)) o.land(0);
+  o.speak(pick(['B-b-brrr!', 'So c-cold!', 'Ice ice baby.'])); addText(o.x, o.y - 30, 'FROZEN!', '#9ad7ff', 20); Sfx.tone(900, 0.3, 'sine', 0.1, 300);
+  for (let i = 0; i < 14; i++) P({ kind: 'spark', x: o.x, y: o.y, vx: rand(-100, 100), vy: rand(-100, 100), g: 0, drag: 0.9, size: 2, life: 0.6, col: '#fff' });
+}
+// Karma Jar: everyone alive gets the average HP
+function karmaJar(c) {
+  const alive = g.critters.filter(o => o.alive); if (!alive.length) return;
+  const avg = Math.max(1, Math.round(alive.reduce((a, o) => a + Math.max(0, o.hp - o.pending), 0) / alive.length));
+  for (const o of alive) {
+    const diff = avg - (o.hp - o.pending); o.hp = avg; o.pending = 0;
+    addText(o.x, o.y - 30, (diff >= 0 ? '+' : '') + diff, diff >= 0 ? '#7CFC9a' : '#ff6b6b', 18);
+    for (let i = 0; i < 10; i++) P({ kind: 'spark', x: o.x, y: o.y, vx: rand(-90, 90), vy: rand(-140, -20), g: 200, drag: 0.95, size: 2, life: 0.7, col: '#ffe066' });
+  }
+  Sfx.teleport(); shake(4); banner(`Karma! Everyone is at ${avg} HP`, '#ffe066'); c.speak(pick(['Fair is fair.', 'Share and share alike!']));
+}
+
 function kazoo(c) {
   const d = aimVec(c), ang = Math.atan2(d.y, d.x);
   Sfx.kazoo();
@@ -214,6 +290,13 @@ function doClickAction(c, id, wx, wy) {
     case 'anvil': g.focus = spawn(new Anvil(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak('Look up!'); break;
     case 'thunder': g.focus = spawn(new Cloud(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak(pick(['Thunder!', 'Zap zap!'])); break;
     case 'shower': g.focus = spawn(new Shower(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak('Make a wish!'); break;
+    case 'balloon': {
+      let best = null, bd = 40;
+      for (const o of g.critters) if (o.alive) { const d = Math.hypot(o.x - wx, o.y - wy); if (d < bd) { bd = d; best = o; } }
+      if (!best) { banner('Click on a critter to tie the balloon to!'); return; }
+      if (best.frozen > 0) { banner("That one's frozen to the ground!"); return; }
+      g.focus = spawn(new Balloon(best)); best.speak(best === c ? pick(['Up, up and away!', 'Bye!']) : pick(['Wha–?!', 'Put me down!', 'Not again!'])); Sfx.whoosh(); useAmmo(id); afterFire(); break;
+    }
     case 'swap': {
       let best = null, bd = 40;
       for (const o of g.critters) if (o.alive && o !== c) { const d = Math.hypot(o.x - wx, o.y - wy); if (d < bd) { bd = d; best = o; } }
@@ -383,6 +466,47 @@ function drawIcon(x, id, s) {
       x.beginPath(); x.moveTo(-14, -6); x.lineTo(10, -6); x.moveTo(5, -11); x.lineTo(10, -6); x.lineTo(5, -1); x.stroke();
       x.beginPath(); x.moveTo(14, 7); x.lineTo(-10, 7); x.moveTo(-5, 2); x.lineTo(-10, 7); x.lineTo(-5, 12); x.stroke();
       x.strokeStyle = '#3a86ff'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(-14, -6); x.lineTo(10, -6); x.stroke(); x.strokeStyle = '#ff4d6d'; x.beginPath(); x.moveTo(14, 7); x.lineTo(-10, 7); x.stroke(); x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; break;
+    case 'frog':
+      x.beginPath(); x.ellipse(0, 4, 15, 10, 0, 0, 7); fs(x, '#59b84a');
+      circ(x, -7, -7, 5); fs(x, '#59b84a'); circ(x, 7, -7, 5); fs(x, '#59b84a');
+      x.fillStyle = '#fff'; circ(x, -7, -7, 3); x.fill(); circ(x, 7, -7, 3); x.fill(); x.fillStyle = '#111'; circ(x, -6, -7, 1.5); x.fill(); circ(x, 8, -7, 1.5); x.fill();
+      x.beginPath(); x.moveTo(-8, 6); x.quadraticCurveTo(0, 12, 8, 6); x.stroke();
+      x.beginPath(); x.moveTo(-14, 10); x.lineTo(-20, 16); x.moveTo(14, 10); x.lineTo(20, 16); x.stroke(); break;
+    case 'zap':
+      rr(x, -11, -6, 22, 22, 4); fs(x, '#bde0fe'); rr(x, -8, -14, 16, 8, 2); fs(x, '#9aa3ad');
+      x.beginPath(); x.moveTo(3, -2); x.lineTo(-4, 5); x.lineTo(1, 5); x.lineTo(-3, 13); x.lineTo(5, 3); x.lineTo(0, 3); x.lineTo(4, -2); x.closePath(); fs(x, '#ffd23f'); break;
+    case 'freeze':
+      rr(x, -16, -4, 24, 8, 3); fs(x, '#7fc8f8'); rr(x, -10, 4, 8, 10, 2); fs(x, '#5a6b8c'); circ(x, 10, 0, 6); fs(x, '#bde0fe');
+      x.strokeStyle = '#fff'; x.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { const a = i * 1.047; x.beginPath(); x.moveTo(19 - Math.cos(a) * 7, -Math.sin(a) * 7); x.lineTo(19 + Math.cos(a) * 7, Math.sin(a) * 7); x.stroke(); }
+      x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; break;
+    case 'balloon':
+      x.beginPath(); x.ellipse(0, -5, 12, 14, 0, 0, 7); fs(x, '#ff5d8f'); x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.ellipse(-4, -10, 3.5, 5, -0.4, 0, 7); x.fill();
+      x.beginPath(); x.moveTo(-3, 9); x.lineTo(3, 9); x.lineTo(0, 12); x.closePath(); fs(x, '#ff5d8f');
+      x.lineWidth = 1.5; x.beginPath(); x.moveTo(0, 12); x.quadraticCurveTo(6, 16, 2, 22); x.stroke(); x.lineWidth = 2.5; break;
+    case 'quake':
+      x.beginPath(); x.moveTo(-20, 12); x.lineTo(-10, -4); x.lineTo(-2, 6); x.lineTo(6, -8); x.lineTo(14, 2); x.lineTo(20, 12); x.closePath(); fs(x, '#8d5a2b');
+      x.lineWidth = 2; x.beginPath(); x.moveTo(-6, 12); x.lineTo(-2, 2); x.lineTo(2, 8); x.lineTo(5, 0); x.stroke();
+      x.strokeStyle = '#ffd23f'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(-24, -2); x.lineTo(-28, -8); x.moveTo(24, -2); x.lineTo(28, -8); x.moveTo(-26, 14); x.lineTo(-30, 16); x.stroke(); x.strokeStyle = '#2b1d12'; break;
+    case 'flood':
+      x.fillStyle = '#4ea8de'; x.beginPath(); x.moveTo(-20, 14); for (let i = -20; i <= 20; i += 2) x.lineTo(i, 2 + Math.sin(i * 0.4) * 3); x.lineTo(20, 14); x.closePath(); x.fill(); x.stroke();
+      x.beginPath(); x.moveTo(0, -18); x.quadraticCurveTo(9, -5, 0, -2); x.quadraticCurveTo(-9, -5, 0, -18); x.closePath(); fs(x, '#4ea8de');
+      x.beginPath(); x.moveTo(-14, -8); x.lineTo(-14, -16); x.moveTo(-17, -13); x.lineTo(-14, -16); x.lineTo(-11, -13); x.stroke(); break;
+    case 'spitter':
+      x.beginPath(); x.moveTo(-18, 4); x.lineTo(-8, 0); x.lineTo(-4, 10); x.lineTo(-14, 14); x.closePath(); fs(x, '#8d5a2b');
+      rr(x, -10, -4, 26, 7, 3); fs(x, '#3b3b45'); circ(x, 18, -1, 4); fs(x, '#3b3b45');
+      x.fillStyle = '#ff2a2a'; circ(x, 18, -1, 1.5); x.fill(); x.fillStyle = '#3b3b45';
+      for (const [sx, sy] of [[8, -12], [14, -17], [2, -17]]) { x.beginPath(); x.ellipse(sx, sy, 3, 2.2, 0, 0, 7); x.fill(); x.stroke(); } break;
+    case 'karma':
+      rr(x, -11, -8, 22, 24, 5); fs(x, 'rgba(200,230,255,0.9)'); rr(x, -8, -14, 16, 7, 2); fs(x, '#a0703f');
+      x.beginPath(); x.moveTo(-5, -1); x.lineTo(5, 9); x.moveTo(5, -1); x.lineTo(-5, 9); x.stroke();
+      circ(x, 0, 4, 3); fs(x, '#ffd23f'); break;
+    case 'cannon':
+      x.save(); x.rotate(-0.5); rr(x, -6, -20, 14, 28, 4); fs(x, '#5c6670'); rr(x, -8, -22, 18, 6, 2); fs(x, '#9aa3ad'); x.restore();
+      circ(x, 0, 10, 6); fs(x, '#3b3b45'); circ(x, 14, -16, 5); fs(x, '#b5814f'); x.fillStyle = '#fff'; circ(x, 13, -17, 1.8); x.fill(); circ(x, 16, -17, 1.8); x.fill();
+      x.strokeStyle = '#ffd23f'; x.beginPath(); x.moveTo(20, -22); x.lineTo(26, -28); x.moveTo(22, -16); x.lineTo(28, -16); x.stroke(); x.strokeStyle = '#2b1d12'; break;
+    case 'seed':
+      x.beginPath(); x.ellipse(0, 0, 7, 10, 0.3, 0, 7); fs(x, '#3b3b45'); x.fillStyle = '#ff2a2a'; circ(x, 1, -2, 2); x.fill(); break;
     case 'meteor':
       circ(x, 0, 0, 11); fs(x, '#5a4a4a'); x.fillStyle = '#ff9f1c'; circ(x, -3, -3, 3); x.fill(); x.fillStyle = '#8a7a7a'; circ(x, 4, 3, 2.5); x.fill(); break;
     case 'egg':

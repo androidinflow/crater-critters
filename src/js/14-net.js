@@ -199,13 +199,13 @@ const Net = {
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };
-const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT'];
+const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT', 'frozen'];
 const NET_KINDS = [
   ['P', Proj, ['type', 'spin', 'fuseT', 'armT', 'trigT', 'stuck']], ['M', Mine, ['trigT', 'spent', 'blink']], ['B', Barrel, ['fuseT']],
   ['C', Crate, ['type', 'chute', 'sway']], ['G', Grave, ['col']], ['L', Lava, ['life', 'stuck']], ['V', Volcano, ['t']],
   ['R', Robot, ['dir', 'legPh', 't']], ['A', Anvil, []], ['E', Pelican, ['dir', 'flap']], ['H', Rope, ['cId', 'tx', 'ty', 'state']],
   ['Q', GasPuff, ['life', 'r']], ['T', Cloud, ['t', 'bolts', 'nextT']], ['D', Drill, ['dx', 'dy']],
-  ['X', Vortex, ['t', 'life']], ['S', Shower, ['t', 'n']],
+  ['X', Vortex, ['t', 'life']], ['S', Shower, ['t', 'n']], ['N', Balloon, ['cId', 't', 'popT']], ['K', Quake, ['t']],
 ];
 const NET_KIND = new Map(NET_KINDS.map(([code, cls, f]) => [cls, { code, cls, f }]));
 const NET_CODE = new Map(NET_KINDS.map(([code, cls, f]) => [code, { code, cls, f }]));
@@ -264,7 +264,7 @@ function applySnap(s) {
     e._nx = a[2]; e._ny = a[3]; e.vx = a[4]; e.vy = a[5];
     k.f.forEach((f, i) => { e[f] = a[6 + i]; });
     if (k.cls === Proj) Object.assign(e, PROJ[e.type] ? { r: PROJ[e.type].r, fuse: PROJ[e.type].fuse } : {});
-    if (k.cls === Rope) e.c = byId.get(e.cId) || g.critters.find(c => c.id === e.cId);
+    if (k.cls === Rope || k.cls === Balloon) e.c = byId.get(e.cId) || g.critters.find(c => c.id === e.cId);
     ents.push(e);
   }
   g.ents = ents;

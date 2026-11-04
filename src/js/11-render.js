@@ -231,6 +231,11 @@ function drawCritter(x, c, t) {
   else { x.arc(r * 0.55, r * 0.3, 2.6, 0.2, Math.PI - 0.2); x.stroke(); }
   // sweat drop when struggling against a wall or badly hurt
   if ((c.blocked && wk > 0.5) || (lowHp && Math.sin(t * 1.1 + c.seed) > 0.6)) { x.fillStyle = '#9ad7ff'; x.beginPath(); x.ellipse(r * 0.95, -r * 0.75 + (t * 10 % 6), 1.3, 2, 0, 0, 7); x.fill(); }
+  // frozen: a block of ice around the whole critter
+  if (c.frozen > 0) {
+    x.globalAlpha = 0.55; x.fillStyle = '#bfe9ff'; x.strokeStyle = '#6cc3ff'; x.lineWidth = 1.5; rr(x, -r * 1.5, -r * 1.75, r * 3, r * 3.3, 3); x.fill(); x.stroke();
+    x.globalAlpha = 0.9; x.strokeStyle = '#fff'; x.lineWidth = 1; x.beginPath(); x.moveTo(-r * 1.2, -r * 1.4); x.lineTo(-r * 0.5, -r * 0.5); x.moveTo(r * 0.8, r * 0.3); x.lineTo(r * 1.3, r * 1.2); x.stroke(); x.globalAlpha = 1;
+  }
   // dizzy stars circling the head
   if (face === 2) {
     x.fillStyle = '#ffe066'; x.strokeStyle = '#8a6a00'; x.lineWidth = 0.6;
@@ -249,6 +254,7 @@ function drawEntity(x, e, t) {
     else if (ty === 'bee') { x.scale(e.vx < 0 ? -1 : 1, 1); drawIcon(x, 'bee', 14 + Math.sin(t * 40)); }
     else if (ty === 'sticky') { drawIcon(x, 'sticky', 13); if (e.armT <= 0 && (e.trigT >= 0 ? (t * 8 | 0) % 2 : (t * 2 | 0) % 2)) { x.fillStyle = '#ff2'; circ(x, 0, -1, 2); x.fill(); } }
     else if (ty === 'boomerang') { x.rotate(t * 22); drawIcon(x, 'boomerang', 14); }
+    else if (ty === 'frog') { x.scale(e.vx < 0 ? -1 : 1, 1); if (e.rest) x.scale(1.15, 0.85); else x.scale(0.92, 1.12); drawIcon(x, 'frog', 15); }
     else if (ty === 'shell') { x.rotate(Math.atan2(e.vy, e.vx) + Math.PI / 2); drawIcon(x, 'acorn', 7); }
     else if (ty === 'meteor') { x.rotate(e.spin); drawIcon(x, 'meteor', 13); }
     else { x.rotate(e.spin); drawIcon(x, ty === 'frag' ? 'frag' : ty, ty === 'melon' ? 15 : ty === 'frag' ? 8 : ty === 'acorn' ? 22 : ty === 'skunk' ? 14 : ty === 'bowling' ? 17 : ty === 'vortex' ? 13 : 12); }
@@ -291,6 +297,14 @@ function drawEntity(x, e, t) {
   } else if (e instanceof Shower) {
     x.restore(); x.save();
     if (e.n < 7) { const sx = e.x, sy = Math.max(cam.y - view.h / 2 / cam.zoom + 30, 40); x.fillStyle = `rgba(255,210,63,${0.5 + 0.5 * Math.sin(t * 12)})`; x.font = 'bold 22px sans-serif'; x.textAlign = 'center'; x.fillText('★ ★ ★', sx, sy); }
+  } else if (e instanceof Balloon) {
+    const c = e.c; x.strokeStyle = '#2b1d12'; x.lineWidth = 1;
+    if (c) { x.beginPath(); x.moveTo(0, 12); x.lineTo(c.x - e.x, c.y - e.y - 6); x.stroke(); }
+    x.fillStyle = '#ff5d8f'; x.lineWidth = 1.5; x.beginPath(); x.ellipse(0, 0, 10, 12, 0, 0, 7); x.fill(); x.stroke();
+    x.fillStyle = 'rgba(255,255,255,0.5)'; x.beginPath(); x.ellipse(-3, -4, 3, 4, -0.4, 0, 7); x.fill();
+    x.fillStyle = '#ff5d8f'; x.beginPath(); x.moveTo(-3, 11); x.lineTo(3, 11); x.lineTo(0, 14); x.closePath(); x.fill(); x.stroke();
+  } else if (e instanceof Quake) {
+    // the shaking camera and crumbling ground are the show
   } else if (e instanceof GasPuff) {
     const a = clamp(e.life < 1 ? e.life : 1, 0, 1) * 0.55, r = e.r || 10;
     x.fillStyle = `rgba(120,200,40,${a})`; circ(x, 0, 0, r); x.fill();
@@ -345,7 +359,7 @@ function drawParticles(x) {
         case 'note': x.globalAlpha = a; x.fillStyle = p.col; x.font = `bold ${p.size | 0}px sans-serif`; x.fillText('♪', p.x, p.y); break;
         case 'icon': x.globalAlpha = Math.min(1, a * 2); x.save(); x.translate(p.x, p.y); x.rotate((p.rot || 0) + (p.vr || 0) * p.t); drawIcon(x, p.icon, p.size); x.restore(); break;
         case 'beam': x.globalAlpha = a; x.lineCap = 'round';
-          for (const [wdt, col] of [[14, 'rgba(255,200,80,0.35)'], [6, '#ffd23f'], [2, '#fff']]) { x.strokeStyle = col; x.lineWidth = wdt * (1 - k * 0.6); x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(p.x2, p.y2); x.stroke(); } break;
+          for (const [wdt, col] of (p.col ? [[14, 'rgba(150,215,255,0.35)'], [6, p.col], [2, '#fff']] : [[14, 'rgba(255,200,80,0.35)'], [6, '#ffd23f'], [2, '#fff']])) { x.strokeStyle = col; x.lineWidth = wdt * (1 - k * 0.6); x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(p.x2, p.y2); x.stroke(); } break;
         case 'bolt': x.globalAlpha = a; x.lineCap = 'round'; x.lineJoin = 'round';
           for (const [wdt, col] of [[9, 'rgba(140,190,255,0.45)'], [4, '#cfe6ff'], [1.5, '#fff']]) { x.strokeStyle = col; x.lineWidth = wdt; x.beginPath(); p.pts.forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke(); } break;
       }
