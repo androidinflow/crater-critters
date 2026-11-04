@@ -54,6 +54,23 @@
   .wbtn.sel{background:#ffe9a8}
   .wgroup h3{margin:10px 0 6px;font-size:15px;opacity:.75;letter-spacing:1px;text-transform:uppercase}
   .wgroup:first-child h3{margin-top:0}
+  #pickInfo{margin-top:12px;padding:8px 12px;border:3px dashed var(--ink);border-radius:14px;width:min(620px,86vw);box-sizing:border-box;display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.4)}
+  #pickInfo .pi-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #pickInfo #piIcon{width:32px;height:32px}
+  #pickInfo .tag{font-size:11px;background:var(--accent2);border:2px solid var(--ink);border-radius:8px;padding:0 6px;text-transform:uppercase;letter-spacing:.5px}
+  #pickInfo .stats{opacity:.75;font-size:12px;margin-left:auto}
+  #pickInfo p{margin:0;font-size:14px;line-height:1.3}
+  #pickInfo button{align-self:flex-start;padding:4px 14px;margin-top:4px}
+  #profileRow{justify-content:center;margin:2px 0 6px} #profName{width:160px}
+  #boardList{max-height:50vh;overflow:auto}
+  #boardList table{border-collapse:collapse;width:100%;font-size:14px}
+  #boardList th,#boardList td{padding:4px 6px;text-align:left;border-bottom:2px solid rgba(43,29,18,.12);white-space:nowrap}
+  #boardList th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
+  #boardList td.num,#boardList th.num{text-align:right}
+  #boardList tr.me{background:#ffe9a8}
+  #boardList tr.me td:first-child::after{content:' (you)';opacity:.6;font-size:11px}
+  @media (max-width:520px){#pickInfo .stats{flex-basis:100%;margin-left:0}}
+  .wbtn.peek{outline:3px solid var(--accent);outline-offset:-3px}
   #winStats{display:inline-block;text-align:left;margin:4px auto 0;font-size:14px;line-height:1.5}
   #winStats b{display:inline-block;min-width:120px}
   .help{columns:2;column-gap:28px;width:min(720px,86vw)}
@@ -136,6 +153,7 @@
     <h1 class="logo">Crater Critters</h1>
     <p class="tag">Small. Round. Extremely explosive.</p>
     <p class="small center" id="mapNote" style="margin:-4px 0 8px">The backdrop previews your map &amp; theme.</p>
+    <div class="row center" id="profileRow"><label for="profName">You</label><input type="text" id="profName" maxlength="20" placeholder="Your name" autocomplete="nickname"><button id="boardBtn">🏆 Leaderboard</button></div>
     <p class="small center hidden" id="iosTip">📱 iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
     <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
     <div class="row"><label>Critters each</label><div class="seg" id="perTeam"></div><span class="small">2 each is roomier for big games</span></div>
@@ -169,7 +187,9 @@
 <!-- ===== Weapon picker ===== -->
 <div id="picker" class="overlay hidden">
   <div class="panel"><h2>Pick your mischief</h2><div id="pickGrid"></div>
-    <p class="center" style="margin:10px 0 0;opacity:.7">Tab / right-click to close</p></div>
+    <div id="pickInfo"><div class="pi-head"><canvas id="piIcon" width="64" height="64"></canvas><b id="piName"></b><span id="piKind" class="tag"></span><span id="piStats" class="stats"></span></div>
+      <p id="piDesc"></p><button id="piEquip" class="hidden">Equip</button></div>
+    <p id="pickTip" class="center" style="margin:10px 0 0;opacity:.7">Tab / right-click to close · hover a weapon to read about it</p></div>
 </div>
 
 <!-- ===== Pause ===== -->
@@ -214,11 +234,23 @@
   </div>
 </div>
 
+<!-- ===== Leaderboard ===== -->
+<div id="board" class="overlay hidden">
+  <div class="panel" style="width:min(640px,94vw)">
+    <h2>🏆 Leaderboard</h2>
+    <p class="small" id="boardMe"></p>
+    <div id="boardList"><p class="small center">Loading…</p></div>
+    <p class="small center" style="margin:8px 0 0;opacity:.7">Wins against the AI and online count. Hot-seat games between friends don't.</p>
+    <div class="actions"><button id="boardClose">Close</button></div>
+  </div>
+</div>
+
 <!-- ===== Game over ===== -->
 <div id="over" class="overlay hidden">
   <div class="panel center" style="min-width:300px">
     <h1 id="winText">Winner!</h1><p id="winSub"></p><div id="winStats"></div>
-    <div class="actions"><button id="rematchBtn" class="big">Rematch!</button><button id="menuBtn">Main menu</button></div>
+    <p class="small" id="overProfile"></p>
+    <div class="actions"><button id="rematchBtn" class="big">Rematch!</button><button id="overBoardBtn">🏆 Leaderboard</button><button id="menuBtn">Main menu</button></div>
   </div>
 </div>
 
@@ -226,8 +258,10 @@
 'use strict';
 /* =====================================================================
    CRATER CRITTERS — a turn-based artillery brawl
+   Built from src/ by build.js — edit the modules in src/js, not this file.
    Sections: CONFIG · UTIL · AUDIO · TERRAIN · PHYSICS · FX · ENTITIES ·
-             WEAPONS · AI · INPUT · RENDERING · UI · GAME STATE MACHINE
+             WEAPONS · AI · INPUT · RENDERING · UI · GAME STATE MACHINE ·
+             NETWORK · CHAT + FULLSCREEN · PROFILE + LEADERBOARD
    ===================================================================== */
 
 // ============================== CONFIG ==============================
@@ -285,39 +319,39 @@ const THEME_NAMES = Object.keys(THEMES);
 
 // Weapon & utility definitions. kind: charge (power bar) | instant | place | click | tool
 const WEAPONS = [
-  { id:'bomb',     name:'Pinecone Bomb',  kind:'charge', hint:'Fuse: {fuse}s  (keys 1–5)' },
-  { id:'rocket',   name:'Bottle Rocket',  kind:'charge', hint:'Wind-affected. Hold Space.' },
-  { id:'bee',      name:'Seeker Bee',     kind:'charge', hint:'{bee}' },
-  { id:'scatter',  name:'Scattershot',    kind:'instant',hint:'Two shots. Space to fire.' },
-  { id:'melon',    name:'Melon Cluster',  kind:'charge', hint:'Splits into 5 bits.' },
-  { id:'robot',    name:'Wind-up Robot',  kind:'place',  hint:'Space again to detonate.' },
-  { id:'kazoo',    name:'Kazoo Blast',    kind:'instant',hint:'Close-range shove!' },
-  { id:'pelican',  name:'Pelican Drop',   kind:'click',  hint:'Click a spot to bomb.', air:true },
-  { id:'anvil',    name:'Anvil Rain',     kind:'click',  hint:'Click a spot. Big!', air:true },
-  { id:'volcano',  name:'Pocket Volcano', kind:'place',  hint:'Space to plant. Lava!' },
-  { id:'dynamite', name:'Dynamite Stick', kind:'place',  hint:'Drop it and RUN.' },
-  { id:'sticky',   name:'Sticky Mine',    kind:'charge', hint:'Sticks, arms in 2s.' },
-  { id:'rifle',    name:'Acorn Rifle',    kind:'instant',hint:'One precise shot, any range.' },
-  { id:'skunk',    name:'Skunk Bomb',     kind:'charge', hint:'Stink cloud that drifts on the wind.' },
-  { id:'slap',     name:'Fish Slap',      kind:'instant',hint:'Melee. Huge shove toward the water!' },
-  { id:'thunder',  name:'Thundercloud',   kind:'click',  hint:'Click a spot: 3 lightning bolts.', air:true },
-  { id:'acorn',    name:'Giant Acorn',    kind:'charge', hint:'Enormous bouncing bomb, 4s fuse.' },
-  { id:'bowling',  name:'Hedge Bowling',  kind:'charge', hint:'Rolls along the ground, bowling critters over.' },
-  { id:'boomerang',name:'Twig Boomerang', kind:'charge', hint:'Curves back to you. Catch it or duck!' },
-  { id:'mortar',   name:'Acorn Mortar',   kind:'charge', hint:'Three shells in a burst.' },
-  { id:'sunbeam',  name:'Sunbeam',        kind:'instant',hint:'Laser that burns through anything.' },
-  { id:'vortex',   name:'Gravity Acorn',  kind:'charge', hint:'Sucks everything nearby toward it.' },
-  { id:'chili',    name:'Chili Breath',   kind:'instant',hint:'Breathe fire! Short range.' },
-  { id:'stomp',    name:'Thunder Stomp',  kind:'instant',hint:'Launch everyone around you skyward.' },
-  { id:'shower',   name:'Star Shower',    kind:'click',  hint:'Click: meteors rain over a wide area.', air:true },
-  { id:'swap',     name:'Switcheroo',     kind:'click',  hint:'Click a critter to swap places with it.' },
-  { id:'grapple',  name:'Grapple Hook',   kind:'tool',   hint:'Space: shoot rope.', util:true },
-  { id:'jetpack',  name:'Jetpack',        kind:'tool',   hint:'Space: ignite.', util:true },
-  { id:'teleport', name:'Teleport Pad',   kind:'click',  hint:'Click a destination.', util:true },
-  { id:'girder',   name:'Girder',         kind:'click',  hint:'↑↓ rotate · click to place', util:true },
-  { id:'drill',    name:'Mole Drill',     kind:'instant',hint:'Space: dig a tunnel along your aim.', util:true },
-  { id:'pogo',     name:'Pogo Stick',     kind:'tool',   hint:'Space: BOING! No fall damage.', util:true },
-  { id:'skip',     name:'Skip Turn',      kind:'tool',   hint:'Space: snooze.', util:true },
+  { id:'bomb',     name:'Pinecone Bomb',  kind:'charge', hint:'Fuse: {fuse}s  (keys 1–5)', desc:'Lob a pinecone over the hill. It bounces, then bursts on a fuse you set with keys 1–5.', stats:'48 dmg · R 48 · fuse 1–5 s' },
+  { id:'rocket',   name:'Bottle Rocket',  kind:'charge', hint:'Wind-affected. Hold Space.', desc:'Straight-line rocket that explodes on impact. Reads the wind gauge before you fire.', stats:'50 dmg · R 50 · wind: full' },
+  { id:'bee',      name:'Seeker Bee',     kind:'charge', hint:'{bee}', desc:'Click a target, then launch. The bee steers toward it and stings on contact.', stats:'45 dmg · R 42 · homing' },
+  { id:'scatter',  name:'Scattershot',    kind:'instant',hint:'Two shots. Space to fire.', desc:'Two quick hitscan shots along your aim. Each one shoves the victim away from you.', stats:'20 dmg × 2 · knockback' },
+  { id:'melon',    name:'Melon Cluster',  kind:'charge', hint:'Splits into 5 bits.', desc:'A melon that pops after 3 s into five fragments that spray forward.', stats:'30 dmg + 5 × 22 · R 38' },
+  { id:'robot',    name:'Wind-up Robot',  kind:'place',  hint:'Space again to detonate.', desc:'Plants a walking robot that marches ahead, shoving critters. Press fire again to detonate.', stats:'55 dmg · R 56 · walks' },
+  { id:'kazoo',    name:'Kazoo Blast',    kind:'instant',hint:'Close-range shove!', desc:'A short blast of sound. Little damage, enormous shove: great near cliffs and water.', stats:'8 dmg · huge knockback' },
+  { id:'pelican',  name:'Pelican Drop',   kind:'click',  hint:'Click a spot to bomb.', air:true, desc:'Click a spot. A pelican flies over and drops a line of eggs on it. Not in caverns.', stats:'5 eggs × 26 dmg · R 34' },
+  { id:'anvil',    name:'Anvil Rain',     kind:'click',  hint:'Click a spot. Big!', air:true, desc:'Click a spot. An anvil falls from the sky, flattening whatever it lands on.', stats:'65 dmg · R 72 · drops anything hit' },
+  { id:'volcano',  name:'Pocket Volcano', kind:'place',  hint:'Space to plant. Lava!', desc:'Plant a tiny volcano at your feet. It erupts lava that sticks and burns for seconds.', stats:'lava: 9 dmg/s · 3.6 s eruption' },
+  { id:'dynamite', name:'Dynamite Stick', kind:'place',  hint:'Drop it and RUN.', desc:'Drop it where you stand, then run. Five second fuse, the biggest bang you carry.', stats:'75 dmg · R 78 · fuse 5 s' },
+  { id:'sticky',   name:'Sticky Mine',    kind:'charge', hint:'Sticks, arms in 2s.', desc:'Throw a mine that sticks to the first thing it touches and arms after 2 s.', stats:'45 dmg · R 46 · proximity' },
+  { id:'rifle',    name:'Acorn Rifle',    kind:'instant',hint:'One precise shot, any range.', desc:'One precise hitscan round at any range, with a laser sight to line it up.', stats:'38 dmg · pinpoint' },
+  { id:'skunk',    name:'Skunk Bomb',     kind:'charge', hint:'Stink cloud that drifts on the wind.', desc:'Lobs a skunk that bursts into a stink cloud. The gas drifts with the wind and poisons.', stats:'10 dmg + gas 7 dmg/s' },
+  { id:'slap',     name:'Fish Slap',      kind:'instant',hint:'Melee. Huge shove toward the water!', desc:'Melee. A wet fish to the face sends the target flying sideways. Aim at water.', stats:'30 dmg · massive shove' },
+  { id:'thunder',  name:'Thundercloud',   kind:'click',  hint:'Click a spot: 3 lightning bolts.', air:true, desc:'Click a spot. A storm cloud forms and fires three lightning bolts at the ground below.', stats:'3 bolts × 34 dmg · R 34' },
+  { id:'acorn',    name:'Giant Acorn',    kind:'charge', hint:'Enormous bouncing bomb, 4s fuse.', desc:'Throw a giant bouncing acorn with a 4 s fuse. Slow, heavy, devastating.', stats:'90 dmg · R 95 · fuse 4 s' },
+  { id:'bowling',  name:'Hedge Bowling',  kind:'charge', hint:'Rolls along the ground, bowling critters over.', desc:'Rolls along the ground and bowls over every critter it meets, then pops.', stats:'14–30 dmg per hit · 20 dmg burst' },
+  { id:'boomerang',name:'Twig Boomerang', kind:'charge', hint:'Curves back to you. Catch it or duck!', desc:'Flies out, curves back to you. Hits an enemy and it explodes; reaches you and you catch it.', stats:'32 dmg · R 36 · returns' },
+  { id:'mortar',   name:'Acorn Mortar',   kind:'charge', hint:'Three shells in a burst.', desc:'Three shells fired in a quick burst along the same arc. Spreads a little.', stats:'3 × 22 dmg · R 30' },
+  { id:'sunbeam',  name:'Sunbeam',        kind:'instant',hint:'Laser that burns through anything.', desc:'A laser that burns a straight tunnel through terrain and anyone standing in it.', stats:'26 dmg per critter · pierces' },
+  { id:'vortex',   name:'Gravity Acorn',  kind:'charge', hint:'Sucks everything nearby toward it.', desc:'Lands and becomes a tiny black hole for 3 s, dragging critters, mines and barrels in.', stats:'18 dmg · R 30 · pulls' },
+  { id:'chili',    name:'Chili Breath',   kind:'instant',hint:'Breathe fire! Short range.', desc:'Breathe a cone of fire in front of you. Burns critters and melts terrain.', stats:'lava: 9 dmg/s · short range' },
+  { id:'stomp',    name:'Thunder Stomp',  kind:'instant',hint:'Launch everyone around you skyward.', desc:'Slam the ground: everyone nearby is launched skyward. No fall damage for them.', stats:'6–20 dmg · launches' },
+  { id:'shower',   name:'Star Shower',    kind:'click',  hint:'Click: meteors rain over a wide area.', air:true, desc:'Click a spot. Seven meteors rain across a wide area. Not in caverns.', stats:'7 × 34 dmg · R 40 · wide' },
+  { id:'swap',     name:'Switcheroo',     kind:'click',  hint:'Click a critter to swap places with it.', desc:'Click any critter to trade places with it. Steal their perch, leave them your cliff edge.', stats:'no damage · instant' },
+  { id:'grapple',  name:'Grapple Hook',   kind:'tool',   hint:'Space: shoot rope.', util:true, desc:'Fire a rope at terrain. Swing with ←→, climb with ↑↓, release with fire.', stats:'rope 18–420 px' },
+  { id:'jetpack',  name:'Jetpack',        kind:'tool',   hint:'Space: ignite.', util:true, desc:'Four seconds of fuel. Hold ↑ to thrust, ←→ to steer. No fall damage while flying.', stats:'fuel 4 s' },
+  { id:'teleport', name:'Teleport Pad',   kind:'click',  hint:'Click a destination.', util:true, desc:'Click any open spot to blink there instantly. Ends your move.', stats:'unlimited range' },
+  { id:'girder',   name:'Girder',         kind:'click',  hint:'↑↓ rotate · click to place', util:true, desc:'Place a steel girder: rotate with ↑↓, click to drop. Bridges, walls, roofs.', stats:'rotatable · permanent' },
+  { id:'drill',    name:'Mole Drill',     kind:'instant',hint:'Space: dig a tunnel along your aim.', util:true, desc:'Burrow a tunnel in the direction you aim. Ends underground, safe and sneaky.', stats:'digs ~34 px wide' },
+  { id:'pogo',     name:'Pogo Stick',     kind:'tool',   hint:'Space: BOING! No fall damage.', util:true, desc:'Hop around on a pogo stick. Big bounces, no fall damage, a little shove on landing.', stats:'no fall damage' },
+  { id:'skip',     name:'Skip Turn',      kind:'tool',   hint:'Space: snooze.', util:true, desc:'Take a nap and pass the turn. Sometimes the best move.', stats:'ends turn' },
 ];
 const WEAP = Object.fromEntries(WEAPONS.map(w => [w.id, w]));
 
@@ -842,7 +876,9 @@ class Critter extends Body {
       mode: 'air', tumble: false, fallDmg: false, bounce: 0.32, friction: 0.25, squash: 0, spin: 0, spinV: 0, flipV: 0,
       walkPh: 0, walking: false, walkAcc: 0, blocked: false, px: 0, py: 0, pvx: 0, pvy: 0, lvx: 0, lvy: 0,
       say: null, hurtT: 0, sadT: 0, jumpT: 0, fuel: 0, rope: null, swing: 0, ropeDL: 0, thrust: false, jetX: 0,
-      voice: rand(330, 640), seed: rand(0, 10), stillT: 0, dyingT: 0, burnQuipT: 0 });
+      voice: rand(330, 640), seed: rand(0, 10), stillT: 0, dyingT: 0, burnQuipT: 0,
+      // animation state (cosmetic): walk blend, idle timer, blink countdown, look-around target, face code + timer
+      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0 });
   }
   busy() { return this.alive && this.mode !== 'ground'; }
   knocked() {
@@ -875,6 +911,7 @@ class Critter extends Body {
     this.squash *= Math.pow(0.0005, dt); if (Math.abs(this.squash) < 0.005) this.squash = 0;
     if (this.say && (this.say.t -= dt) <= 0) this.say = null;
     this.hurtT = Math.max(0, this.hurtT - dt); this.sadT = Math.max(0, this.sadT - dt); this.burnQuipT -= dt;
+    this.anim(dt);
     switch (this.mode) {
       case 'ground':
         if (circleHits(this.x, this.y, this.r)) pushOut(this);
@@ -948,12 +985,22 @@ class Critter extends Body {
     }
   }
   trail() { if (this.mode === 'jet' && this.thrust && this.fuel > 0 && Math.random() < 0.8) P({ kind: 'fire', x: this.x - this.facing * 6, y: this.y + 8, vx: rand(-20, 20), vy: rand(120, 220), g: 0, drag: 0.9, size: rand(3, 6), life: 0.25 }); }
+  // Cosmetic timers (run on host and guest alike): walk blend, idle clock, blinks, faces.
+  anim(dt) {
+    this.walkT = clamp(this.walkT + (this.walking ? 9 : -6) * dt, 0, 1);
+    const resting = this.mode === 'ground' && !this.walking && this.hurtT <= 0 && !(this === g.active && g.state === 'turn' && g.controlling);
+    this.idleT = resting ? this.idleT + dt : 0;
+    if ((this.blinkT -= dt) < -0.02) this.blinkT = rand(2, 5.5);
+    if (this.faceT > 0 && (this.faceT -= dt) <= 0) this.face = 0;
+    if ((this.lookT -= dt) <= 0) { this.lookT = rand(1.2, 3); this.lookX = rand(-1.6, 1.6); this.lookY = rand(-1, 1.2); }
+  }
   // Googly eyes: pupils are damped springs pulled toward the look direction and
   // flung around by the body's own changes in velocity.
   eyes(dt) {
     const active = this === g.active && g.state === 'turn';
     const av = aimVec(this);
-    const lx = active ? av.x * 1.5 : this.facing * 0.8, ly = (active ? av.y * 1.5 : 0) + 0.5;
+    const idle = this.idleT > 2.5 && !active;
+    const lx = active ? av.x * 1.5 : idle ? this.lookX : this.facing * 0.8, ly = (active ? av.y * 1.5 : idle ? this.lookY : 0) + 0.5;
     this.pvx += (lx - this.px) * 140 * dt - (this.vx - this.lvx) * 0.07;
     this.pvy += (ly - this.py) * 140 * dt - (this.vy - this.lvy) * 0.07 + (this.walking ? Math.sin(this.walkPh) * 2 : 0);
     this.lvx = this.vx; this.lvy = this.vy;
@@ -1158,7 +1205,7 @@ class Lava extends Body {
     localFx(this);
     for (const c of g.critters) if (c.alive && Math.hypot(c.x - this.x, c.y - this.y) < c.r + 5) {
       // damage over time: ~9 HP/s per blob touching you
-      c.pending += 9 * dt; c.hurtT = 0.3;
+      c.pending += 9 * dt; c.hurtT = 0.3; c.face = 3; c.faceT = 0.5;
       if (c.burnQuipT <= 0) { c.speak(pick(QUIPS.burn)); c.burnQuipT = 2.5; }
       if (c === g.active && g.state === 'turn' && g.controlling) endControl();
     }
@@ -1179,7 +1226,7 @@ class GasPuff extends Body {
     if (!Terrain.solid(nx, ny)) { this.x = nx; this.y = ny; } else { this.vx *= -0.3; this.vy = -14; }
     this.r = this.r0 * (1 + Math.min(1, this.age / 1.5)) * (this.life < 1 ? Math.max(0.2, this.life) : 1);
     for (const c of g.critters) if (c.alive && c.gasT !== g.time && Math.hypot(c.x - this.x, c.y - this.y) < c.r + this.r * 0.8) {
-      c.gasT = g.time; c.pending += 7 * dt; c.hurtT = 0.3;
+      c.gasT = g.time; c.pending += 7 * dt; c.hurtT = 0.3; c.face = 4; c.faceT = 0.6;
       if (c.burnQuipT <= 0) { c.speak(pick(QUIPS.gas)); c.burnQuipT = 2.5; }
       if (c === g.active && g.state === 'turn' && g.controlling) endControl();
     }
@@ -1378,7 +1425,7 @@ class Rope {
 // ============================== WEAPONS ==============================
 function aimVec(c) { return { x: Math.cos(c.aim) * c.facing, y: Math.sin(c.aim) }; }
 function hasAmmo(team, id) { const a = team.ammo[id] ?? 0; return a === -1 || a > 0; }
-function useAmmo(id) { const t = g.active && g.active.team; if (t && t.ammo[id] > 0) t.ammo[id]--; }
+function useAmmo(id) { const t = g.active && g.active.team; if (!t) return; (t.used ||= {})[id] = (t.used[id] || 0) + 1; if (t.ammo[id] > 0) t.ammo[id]--; }
 function weaponUsable(team, id) { return hasAmmo(team, id) && !(WEAP[id].air && Terrain.cavern); }
 function spawn(e) { e.id = ++g.nextId; g.ents.push(e); return e; }
 
@@ -2156,55 +2203,106 @@ function drawWater(front, vx0, vx1, vy1) {
 }
 
 function drawCritter(x, c, t) {
-  const r = c.r;
+  const r = c.r, f = c.facing, col = c.team.color;
+  const wk = c.walkT || 0, ph = c.walkPh, idle = c.idleT || 0;
+  const active = c === g.active && g.state === 'turn';
+  // --- idle gags, all derived from the idle clock so host and guest agree ---
+  const tap = idle > 5 && (idle - 5) % 6 < 1.5 ? Math.abs(Math.sin((idle - 5) % 6 * 8)) : 0;          // foot tapping
+  const yawn = idle > 9 && (idle - 9) % 13 < 1.3 ? Math.sin((idle - 9) % 13 / 1.3 * Math.PI) : 0;     // big yawn
+  const ruffle = idle > 3 && (idle - 3) % 8 < 0.45 ? Math.sin((idle - 3) % 8 / 0.45 * Math.PI * 4) * 0.14 : 0; // quill shake
+  const blink = c.blinkT >= 0 && c.blinkT < 0.16 ? Math.sin(c.blinkT / 0.16 * Math.PI) : 0;
   x.save(); x.translate(c.x, c.y);
   if (c.dyingT > 0) x.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 20));
-  const br = Math.sin(t * 3 + c.seed) * 0.03, sq = c.squash + br;
+  const br = Math.sin(t * 3 + c.seed) * 0.03, sq = c.squash + br - yawn * 0.06;
+  // walk: bob up on each step, squash a little on footfall
+  const bob = Math.abs(Math.sin(ph)) * 1.6 * wk;
+  x.translate(0, -bob);
   // squash & stretch anchored at the feet
   x.translate(0, r); x.scale(1 + sq, 1 - sq); x.translate(0, -r);
   if (c.spin) x.rotate(c.spin);
-  const f = c.facing; x.scale(f, 1);
-  const col = c.team.color;
+  x.scale(f, 1);
+  // lean into the walk (more when shoving against a wall), gentle sway while idle
+  x.rotate(wk * (c.blocked ? 0.3 : 0.13) + (idle > 1 ? Math.sin(t * 1.4 + c.seed) * 0.025 : 0) + yawn * -0.08);
+  const scared = c.dyingT <= 0 && c.faceT <= 0 && (c.tumble || (c.mode === 'air' && c.vy > 330));
   // quills along the back & top
   x.fillStyle = '#6b4427'; x.strokeStyle = '#3b2414'; x.lineWidth = 1;
   for (let i = 0; i < 9; i++) {
-    const a = Math.PI * 0.72 + i * (Math.PI * 1.08 / 8), wob = Math.sin(t * 6 + i + c.seed) * 0.05 + (c.hurtT > 0 ? 0.35 : 0);
+    const a = Math.PI * 0.72 + i * (Math.PI * 1.08 / 8);
+    const wob = Math.sin(t * 6 + i + c.seed) * 0.05 + (c.hurtT > 0 || scared ? 0.35 : 0) + Math.sin(ph + i * 0.3) * 0.1 * wk + ruffle;
     const len = r * (1.5 + wob + (i % 2) * 0.15);
+    const sw = -wk * 0.12; // quills trail behind while walking
     x.beginPath(); x.moveTo(Math.cos(a - 0.2) * r * 0.85, Math.sin(a - 0.2) * r * 0.85);
-    x.lineTo(Math.cos(a) * len, Math.sin(a) * len); x.lineTo(Math.cos(a + 0.2) * r * 0.85, Math.sin(a + 0.2) * r * 0.85); x.fill(); x.stroke();
+    x.lineTo(Math.cos(a + sw) * len, Math.sin(a + sw) * len); x.lineTo(Math.cos(a + 0.2) * r * 0.85, Math.sin(a + 0.2) * r * 0.85); x.fill(); x.stroke();
   }
-  // feet
-  const ph = c.walking ? Math.sin(c.walkPh) * 2.5 : 0;
+  // feet: stepping cycle while walking (swing forward + lift), tapping while bored
   x.fillStyle = '#e09a6a'; x.strokeStyle = '#3b2414'; x.lineWidth = 1.2;
-  x.beginPath(); x.ellipse(-3.5 + ph, r - 0.5, 3.5, 2.2, 0, 0, 7); x.fill(); x.stroke();
-  x.beginPath(); x.ellipse(4 - ph, r - 0.5, 3.5, 2.2, 0, 0, 7); x.fill(); x.stroke();
+  const s1 = Math.sin(ph) * wk, s2 = Math.sin(ph + Math.PI) * wk;
+  x.beginPath(); x.ellipse(-3.5 + s1 * 3.2, r - 0.5 - Math.max(0, s1) * 2.4 + bob * 0.5, 3.5, 2.2, s1 * 0.3, 0, 7); x.fill(); x.stroke();
+  x.beginPath(); x.ellipse(4 + s2 * 3.2, r - 0.5 - Math.max(0, s2) * 2.4 - tap * 2.6 + bob * 0.5, 3.5, 2.2, s2 * 0.3 - tap * 0.5, 0, 7); x.fill(); x.stroke();
   // body
   x.fillStyle = '#b5814f'; x.lineWidth = 1.4; circ(x, 0, 0, r); x.fill(); x.stroke();
-  x.fillStyle = '#f2d3a8'; x.beginPath(); x.ellipse(r * 0.35, r * 0.15, r * 0.62, r * 0.72, 0, 0, 7); x.fill();
-  // team bandana with fluttering tails
+  x.fillStyle = c.face === 4 && c.faceT > 0 ? '#cfe7a0' : '#f2d3a8'; x.beginPath(); x.ellipse(r * 0.35, r * 0.15, r * 0.62, r * 0.72, 0, 0, 7); x.fill();
+  // soot smudges when burnt
+  if (c.face === 3 && c.faceT > 0) { x.fillStyle = 'rgba(40,30,25,0.55)'; x.beginPath(); x.ellipse(r * 0.25, r * 0.5, 2.6, 1.5, 0.4, 0, 7); x.fill(); x.beginPath(); x.ellipse(r * 0.75, -r * 0.6, 2, 1.3, -0.5, 0, 7); x.fill(); }
+  // team bandana with fluttering tails (flutter harder while moving)
   x.strokeStyle = col; x.lineWidth = 3.2; x.beginPath(); x.arc(0, 0, r - 1.2, -Math.PI * 0.92, -Math.PI * 0.18); x.stroke();
-  x.fillStyle = col; const tw = Math.sin(t * 9 + c.seed) * 2;
-  x.beginPath(); x.moveTo(-r * 0.85, -r * 0.4); x.lineTo(-r * 1.55, -r * 0.55 + tw); x.lineTo(-r * 1.4, -r * 0.1 + tw); x.closePath(); x.fill();
+  x.fillStyle = col; const tw = Math.sin(t * 9 + c.seed) * (2 + wk * 3), tb = wk * 3;
+  x.beginPath(); x.moveTo(-r * 0.85, -r * 0.4); x.lineTo(-r * 1.55 - tb, -r * 0.55 + tw); x.lineTo(-r * 1.4 - tb, -r * 0.1 + tw); x.closePath(); x.fill();
+  // bandage once badly hurt
+  const lowHp = c.alive && c.hp - c.pending <= 30 && c.hp > 0;
+  if (lowHp) { x.strokeStyle = '#f4f1ea'; x.lineWidth = 2.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(r * 0.05, -r * 0.95); x.lineTo(r * 0.45, -r * 0.62); x.moveTo(r * 0.4, -r * 0.98); x.lineTo(r * 0.1, -r * 0.6); x.stroke(); x.lineCap = 'butt'; }
   // nose
   x.fillStyle = '#2b1d12'; circ(x, r * 0.98, r * 0.12, 1.8); x.fill();
-  // googly eyes
+  // eyes
   const eyes = [[r * 0.18, -r * 0.32, r * 0.36], [r * 0.62, -r * 0.28, r * 0.33]];
-  const hurt = c.hurtT > 0 || c.dyingT > 0, sad = c.sadT > 0;
-  for (const [ex, ey, er] of eyes) {
+  const face = c.faceT > 0 ? c.face : 0, dying = c.dyingT > 0, sad = c.sadT > 0 && !face;
+  const focus = active && g.charging && !face;
+  for (let k = 0; k < 2; k++) {
+    const [ex, ey, er] = eyes[k];
     x.fillStyle = '#fff'; x.strokeStyle = '#2b1d12'; x.lineWidth = 1; circ(x, ex, ey, er); x.fill(); x.stroke();
-    if (hurt) { x.lineWidth = 1.3; x.beginPath(); x.moveTo(ex - er * 0.5, ey - er * 0.5); x.lineTo(ex + er * 0.5, ey + er * 0.5); x.moveTo(ex + er * 0.5, ey - er * 0.5); x.lineTo(ex - er * 0.5, ey + er * 0.5); x.stroke(); }
-    else {
-      x.fillStyle = '#111'; circ(x, ex + c.px * f * er / 4, ey + c.py * er / 4, er * 0.48); x.fill();
-      if (sad) { x.fillStyle = '#b5814f'; x.fillRect(ex - er - 0.5, ey - er - 0.5, er * 2 + 1, er * 0.95); x.beginPath(); x.moveTo(ex - er, ey - er * 0.05); x.lineTo(ex + er, ey - er * 0.05); x.stroke(); }
+    if (dying) { // X eyes
+      x.lineWidth = 1.3; x.beginPath(); x.moveTo(ex - er * 0.5, ey - er * 0.5); x.lineTo(ex + er * 0.5, ey + er * 0.5); x.moveTo(ex + er * 0.5, ey - er * 0.5); x.lineTo(ex - er * 0.5, ey + er * 0.5); x.stroke();
+    } else if (face === 2) { // dizzy spirals
+      x.lineWidth = 1.1; x.beginPath();
+      for (let a = 0; a < 7; a += 0.3) { const rr = a / 7 * er * 0.7; x.lineTo(ex + Math.cos(a + t * 9) * rr, ey + Math.sin(a + t * 9) * rr); } x.stroke();
+    } else if (face === 1) { // ouch: clenched  > <
+      x.lineWidth = 1.5; x.beginPath(); const d = k === 0 ? 1 : -1;
+      x.moveTo(ex - d * er * 0.45, ey - er * 0.5); x.lineTo(ex + d * er * 0.3, ey); x.lineTo(ex - d * er * 0.45, ey + er * 0.5); x.stroke();
+      // tears flung from the eyes right after the hit
+      if (c.hurtT > 0.5) { const q = (0.9 - c.hurtT) / 0.4; x.fillStyle = '#9ad7ff'; circ(x, ex - er - q * 6, ey - er * 0.3 + q * q * 7, 1.6 - q); x.fill(); circ(x, ex + er + q * 5, ey - er * 0.6 + q * q * 8, 1.5 - q); x.fill(); }
+    } else if (face === 3) { // burnt: squint
+      x.lineWidth = 1.4; x.beginPath(); x.moveTo(ex - er * 0.6, ey + er * 0.15); x.lineTo(ex + er * 0.6, ey - er * 0.05); x.stroke();
+    } else if (face === 4) { // gassed: cross-eyed
+      x.fillStyle = '#111'; circ(x, ex + (k === 0 ? er * 0.35 : -er * 0.35), ey + er * 0.1, er * 0.45); x.fill();
+    } else if (scared) { // wide eyes, tiny pupils
+      x.fillStyle = '#111'; circ(x, ex + c.px * f * er / 4, ey + c.py * er / 4, er * 0.28); x.fill();
+    } else {
+      x.fillStyle = '#111'; circ(x, ex + c.px * f * er / 4, ey + c.py * er / 4, er * (yawn > 0.3 ? 0.3 : 0.48)); x.fill();
+      // eyelids: blink, sad droop, yawn squint, tired half-lid at low HP
+      const lid = Math.max(blink, sad ? 0.55 : 0, yawn * 0.8, lowHp ? 0.25 : 0);
+      if (lid > 0) { x.fillStyle = '#b5814f'; x.fillRect(ex - er - 0.5, ey - er - 0.5, er * 2 + 1, er * 2 * lid * 0.95); x.beginPath(); x.moveTo(ex - er, ey - er + er * 2 * lid * 0.95); x.lineTo(ex + er, ey - er + er * 2 * lid * 0.95); x.stroke(); }
+      if (focus) { x.lineWidth = 1.6; x.beginPath(); x.moveTo(ex - er * 0.9, ey - er * 1.1 - (k ? 0.5 : 0)); x.lineTo(ex + er * 0.9, ey - er * 0.75 - (k ? -0.4 : 0)); x.stroke(); } // determined brows
     }
   }
   // mouth
   x.strokeStyle = '#2b1d12'; x.lineWidth = 1.2; x.beginPath();
-  if (hurt || c.tumble) { x.fillStyle = '#5a1a1a'; x.ellipse(r * 0.55, r * 0.42, 2, 2.6, 0, 0, 7); x.fill(); }
+  if (dying || face === 1 || face === 2 || scared) { x.fillStyle = '#5a1a1a'; x.ellipse(r * 0.55, r * 0.42, face === 2 ? 2.6 : 2, scared ? 3.2 : 2.6, 0, 0, 7); x.fill(); }
+  else if (face === 4) { x.moveTo(r * 0.3, r * 0.45); x.lineTo(r * 0.8, r * 0.45); x.stroke(); x.fillStyle = '#e06c8a'; x.beginPath(); x.ellipse(r * 0.6, r * 0.62, 1.8, 2.6, 0, 0, 7); x.fill(); } // tongue out
+  else if (face === 3) { x.moveTo(r * 0.3, r * 0.45); for (let i = 1; i <= 5; i++) x.lineTo(r * 0.3 + i * r * 0.1, r * 0.45 + (i % 2 ? -1.5 : 1.5)); x.stroke(); }
+  else if (yawn > 0.2) { x.fillStyle = '#5a1a1a'; x.ellipse(r * 0.55, r * 0.45, 2.2 * yawn + 0.5, 3.4 * yawn + 0.5, 0, 0, 7); x.fill(); }
   else if (sad) { x.moveTo(r * 0.3, r * 0.5); x.quadraticCurveTo(r * 0.55, r * 0.3, r * 0.8, r * 0.5); x.stroke(); x.fillStyle = '#ff7aa2'; x.beginPath(); x.ellipse(r * 0.62, r * 0.55, 1.6, 2.4, 0.3, 0, 7); x.fill(); }
+  else if (focus) { x.moveTo(r * 0.35, r * 0.42); x.lineTo(r * 0.8, r * 0.42); x.stroke(); }
   else { x.arc(r * 0.55, r * 0.3, 2.6, 0.2, Math.PI - 0.2); x.stroke(); }
+  // sweat drop when struggling against a wall or badly hurt
+  if ((c.blocked && wk > 0.5) || (lowHp && Math.sin(t * 1.1 + c.seed) > 0.6)) { x.fillStyle = '#9ad7ff'; x.beginPath(); x.ellipse(r * 0.95, -r * 0.75 + (t * 10 % 6), 1.3, 2, 0, 0, 7); x.fill(); }
+  // dizzy stars circling the head
+  if (face === 2) {
+    x.fillStyle = '#ffe066'; x.strokeStyle = '#8a6a00'; x.lineWidth = 0.6;
+    for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1, sx = Math.cos(a) * r * 1.2, sy = -r * 1.35 + Math.sin(a) * r * 0.35; star(x, sx, sy, 2.4); x.fill(); x.stroke(); }
+  }
   x.restore();
 }
+function star(x, cx, cy, s) { x.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? s * 0.45 : s; x.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } x.closePath(); }
 
 function drawEntity(x, e, t) {
   if (e instanceof Critter) return; // drawn in a separate pass
@@ -2590,25 +2688,47 @@ const UI = {
     bindSel('mapStyle', 'map', false, startBackdrop); bindSel('theme', 'theme', false, startBackdrop);
   },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
-  hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
+  hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
     if (!(g.state === 'turn' && g.controlling && !g.ai && !g.fired && !g.lockWeapon && !this.paused && myTurn())) return;
     if (Net.role !== 'guest') g.charging = false;
-    const root = $('pickGrid'); root.innerHTML = ''; const team = g.active.team;
+    const root = $('pickGrid'); root.innerHTML = ''; const team = g.active.team, T = this.touch;
+    const KIND = { charge: 'charge & throw', instant: 'fire', place: 'place', click: T ? 'tap a target' : 'click a target', tool: 'tool' };
+    let peek = null; // touch: the weapon being read about (first tap reads, second tap equips)
+    const showInfo = (W, b) => {
+      const usable = weaponUsable(team, W.id), a = team.ammo[W.id] ?? 0;
+      $('piName').textContent = W.name; $('piKind').textContent = KIND[W.kind];
+      $('piStats').textContent = (a === -1 ? '∞ ammo · ' : a > 0 ? a + ' left · ' : 'no ammo · ') + W.stats;
+      let d = W.desc; if (T) d = d.replace(/Click/g, 'Tap').replace(/click/g, 'tap').replace('with keys 1–5', 'by tapping the fuse');
+      if (W.air && Terrain.cavern) d += ' (Not available in caverns.)';
+      $('piDesc').textContent = d;
+      const x = $('piIcon').getContext('2d'); x.clearRect(0, 0, 64, 64); x.save(); x.translate(32, 34); drawIcon(x, W.id, 52); x.restore();
+      const eq = $('piEquip'); eq.classList.toggle('hidden', !T); eq.disabled = !usable; eq.onclick = () => equip(W);
+      root.querySelectorAll('.peek').forEach(e => e.classList.remove('peek')); if (b && T) b.classList.add('peek');
+    };
+    const equip = W => { if (!weaponUsable(team, W.id)) return; selectWeapon(W.id); this.togglePicker(); Sfx.tone(700, 0.06, 'square', 0.06); };
     for (const [title, filt] of [['Weapons', W => !W.util], ['Tools', W => W.util]]) {
       const grp = document.createElement('div'); grp.className = 'wgroup'; const h = document.createElement('h3'); h.textContent = title;
       const grid = document.createElement('div'); grid.className = 'wgrid'; grp.append(h, grid); root.appendChild(grp);
       for (const W of WEAPONS.filter(filt)) {
-        const b = document.createElement('button'); b.className = 'wbtn' + (g.weapon === W.id ? ' sel' : ''); b.title = W.hint.replace('{fuse}', g.fuse).replace('{bee}', 'Click to set a target.');
+        const b = document.createElement('button'); b.className = 'wbtn' + (g.weapon === W.id ? ' sel' : ''); b.title = T ? '' : W.desc;
         const cv = document.createElement('canvas'); cv.width = 96; cv.height = 96; const x = cv.getContext('2d'); x.translate(48, 50); drawIcon(x, W.id, 80);
         const a = team.ammo[W.id] ?? 0, lab = document.createElement('span'); lab.textContent = W.name;
         const am = document.createElement('span'); am.className = 'ammo'; am.textContent = a === -1 ? '∞' : a;
-        b.append(cv, lab, am); b.disabled = !weaponUsable(team, W.id);
-        b.onclick = () => { selectWeapon(W.id); this.togglePicker(); Sfx.tone(700, 0.06, 'square', 0.06); };
+        b.append(cv, lab, am);
+        // unusable weapons stay readable (greyed, not disabled) so you can still learn what they do
+        if (!weaponUsable(team, W.id)) { b.style.opacity = 0.45; b.setAttribute('aria-disabled', 'true'); }
+        b.onmouseenter = b.onfocus = () => { if (!T) showInfo(W, b); };
+        b.onclick = () => {
+          if (T && peek !== W.id) { peek = W.id; showInfo(W, b); Sfx.tone(520, 0.04, 'square', 0.04); return; }
+          equip(W);
+        };
         grid.appendChild(b);
+        if (g.weapon === W.id) showInfo(W, null);
       }
     }
+    $('pickTip').textContent = T ? 'Tap a weapon to read about it, tap again to equip' : 'Tab / right-click to close · hover a weapon to read about it';
     $('picker').classList.remove('hidden'); this.pickerOpen = true;
   },
   togglePause() {
@@ -2631,6 +2751,7 @@ const UI = {
       row.append(nm, document.createTextNode(` ${Math.round(t.dmg)} damage · ${t.kills} KO${t.kills === 1 ? '' : 's'}${t === best && t.dmg > 0 ? ' · 🏆 most damage' : ''}`));
       st.appendChild(row);
     }
+    Profile.report();
   },
 };
 $('startBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); UI.hideAll(); newGame(); };
@@ -2659,7 +2780,7 @@ function drawMascots(t) {
   mascots.forEach((m, i) => {
     m.team.color = TEAM_COLORS[(settings.teams[i] || { color: i }).color];
     const hop = Math.max(0, Math.sin(t * 3 + i * 1.3)); m.y = 62 - hop * 18; m.squash = hop < 0.1 ? 0.15 : -0.05;
-    m.px = Math.sin(t * 5 + i) * 1.5; m.py = Math.cos(t * 4 + i) * 1.2 + 0.5; m.hurtT = (t + i) % 6 < 0.4 ? 1 : 0;
+    m.px = Math.sin(t * 5 + i) * 1.5; m.py = Math.cos(t * 4 + i) * 1.2 + 0.5; m.hurtT = (t + i) % 6 < 0.4 ? 1 : 0; m.blinkT = ((t * 0.9 + i * 1.7) % 3.3); m.face = m.hurtT ? 1 : 0; m.faceT = m.hurtT;
     drawCritter(x, m, t);
   });
 }
@@ -2698,10 +2819,10 @@ function takeSpot(spots, used, minD) {
 function newGame(cfg) {
   g = makeState(); g.online = !!cfg; Net.log = []; Net.events = []; g.perTeam = settings.perTeam || 4;
   const s = settings, sc = SCHEMES[s.scheme] || SCHEMES.Classic, seed = Math.random() * 1e9 | 0;
-  g.scheme = sc; g.seed = seed; g.mapStyle = resolveMap(s.map); g.theme = resolveTheme(s.theme);
+  g.scheme = sc; g.schemeName = s.scheme; g.seed = seed; g.mapStyle = resolveMap(s.map); g.theme = resolveTheme(s.theme);
   Terrain.generate(g.mapStyle, seed, g.theme); bg = makeBackground(seed, Terrain.cavern);
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
-  g.teams = (cfg ? cfg.teams : settings.teams.slice(0, s.numTeams)).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0 }));
+  g.teams = (cfg ? cfg.teams : settings.teams.slice(0, s.numTeams)).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
   const spots = surfaceSpots(), used = [];
   for (const t of g.teams) for (let k = 0; k < g.perTeam; k++) {
     const c = new Critter(t, names.pop() || 'Critter'), sp = takeSpot(spots, used, 70);
@@ -2721,6 +2842,7 @@ function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)
 function hurt(c, amt) {
   if (!c.alive || amt <= 0) return;
   c.pending += amt; c.hurtT = 0.9;
+  if (amt >= 25 || c.hp - c.pending <= 0) { c.face = 2; c.faceT = 1.7; } else if (c.faceT <= 0 || c.face === 1) { c.face = 1; c.faceT = 0.9; }   // 2 = dizzy, 1 = ouch
   const at = g.active && g.active.team; if (at && at !== c.team) at.dmg += amt;   // credit the team whose turn it is
   if (Math.random() < 0.6 || amt > 25) c.speak(pick(QUIPS.hit)); else Sfx.blip(c.voice * 1.3, 2);
   if (c === g.active && g.state === 'turn' && g.controlling) endControl();
@@ -3045,15 +3167,15 @@ const Net = {
     if (this.role === 'host') UI.netStatus(this.started ? 'Reconnected.' : 'Waiting for friends to join…');
     else { this.accepted = false; UI.netStatus(this.started ? 'Reconnected – syncing…' : 'Looking for the host…'); this.hello(); }
   },
-  hello() { const t = settings.teams[0]; this.send({ t: 'hello', pid: this.pid, name: String(t.name || 'Friend').slice(0, 18), color: t.color | 0 }); this.helloT = 0; },
+  hello() { const t = settings.teams[0]; this.send({ t: 'hello', pid: this.pid, name: Profile.name().slice(0, 18), color: t.color | 0 }); this.helloT = 0; },
   renderRoster() {
     const ul = $('roster'); if (!ul) return; ul.innerHTML = '';
-    const list = this.role === 'host' ? [{ name: settings.teams[0].name, color: settings.teams[0].color, host: true }, ...this.peerList()] : this.roster;
+    const list = this.role === 'host' ? [{ name: Profile.name(), color: settings.teams[0].color, host: true }, ...this.peerList()] : this.roster;
     for (const p of list) { const li = document.createElement('li'); li.textContent = (p.host ? '👑 ' : '') + p.name; li.style.color = TEAM_COLORS[p.color | 0]; if (p.lost) li.className = 'lost'; ul.appendChild(li); }
     const b = $('startOnline'); if (b) { const n = this.peerList().length; b.disabled = !n; b.textContent = n ? `Start game (${n + 1} players)` : 'Start game'; }
   },
   broadcastRoster() {
-    this.roster = [{ name: settings.teams[0].name, color: settings.teams[0].color, host: true }, ...this.peerList().map(p => ({ name: p.name, color: p.color, lost: p.lost }))];
+    this.roster = [{ name: Profile.name(), color: settings.teams[0].color, host: true }, ...this.peerList().map(p => ({ name: p.name, color: p.color, lost: p.lost }))];
     this.send({ t: 'roster', host: 1, list: this.roster, started: this.started });
     this.renderRoster();
   },
@@ -3069,7 +3191,7 @@ const Net = {
   },
   sendInit(to) {
     const slots = {}; for (const k in this.peers) slots[k] = this.peers[k].team;
-    this.send({ t: 'init', host: 1, to, slots, seed: g.seed, map: g.mapStyle, theme: g.theme, perTeam: g.perTeam, turnTime: settings.turnTime, sdMinutes: settings.sdMinutes,
+    this.send({ t: 'init', host: 1, to, slots, seed: g.seed, map: g.mapStyle, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: settings.turnTime, sdMinutes: settings.sdMinutes,
       teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
   },
   onMsg(m) {
@@ -3145,23 +3267,23 @@ const Net = {
     return { t: 's', st: g.state, tt: nr(g.turnT), w: nr(g.wind), wp: g.weapon, fu: g.fuse, tg: g.target ? [nr(g.target.x), nr(g.target.y)] : 0,
       ch: g.charging, pw: nr(g.power), rt: g.retreat, fi: g.fired, lw: g.lockWeapon, ct: g.controlling, ga: nr(g.girderAng), sl: g.shotsLeft, rb: !!g.robot,
       a: g.active ? g.active.id : 0, wy: nr(g.waterY), sd: g.sd, tm: nr(g.time), ts: nr(g.turnStartT), sm: nr(g.slowmo), sh: nr(g.shake), win: g.winner ? g.winner.idx : -1,
-      cf: t ? [nr(t.x), nr(t.y)] : 0, am: g.teams.map(t => t.ammo), dm: g.teams.map(t => [Math.round(t.dmg), t.kills]),
+      cf: t ? [nr(t.x), nr(t.y)] : 0, am: g.teams.map(t => t.ammo), dm: g.teams.map(t => [Math.round(t.dmg), t.kills]), us: g.teams.map(t => t.used),
       c: g.critters.map(c => [c.id, c.team.idx, c.name, ...CRIT_F.map(f => nr(c[f])), c.say ? [c.say.text, nr(c.say.t)] : 0]),
       e: g.ents.filter(e => !(e instanceof Critter) && !e.dead).map(e => { const k = NET_KIND.get(e.constructor); if (!k) return null; if (e instanceof Rope) e.cId = e.c.id;
         return [k.code, e.id, nr(e.x), nr(e.y), nr(e.vx || 0), nr(e.vy || 0), ...k.f.map(f => nr(e[f]))]; }).filter(Boolean) };
   },
   setupGuest(m) {
     UI.hideAll(); this.started = true; this.hostLost = false; this.myTeam = m.slots[this.pid];
-    g = makeState(); g.online = true; g.seed = m.seed; g.perTeam = m.perTeam || 4; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
+    g = makeState(); g.online = true; g.seed = m.seed; g.schemeName = m.scheme || ''; g.perTeam = m.perTeam || 4; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
     Terrain.generate(m.map, m.seed, m.theme); bg = makeBackground(m.seed, Terrain.cavern);
     applyEvents(m.log);
-    g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0 }));
+    g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
     applySnap(m.snap);
     cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };
-const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust'];
+const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT'];
 const NET_KINDS = [
   ['P', Proj, ['type', 'spin', 'fuseT', 'armT', 'trigT', 'stuck']], ['M', Mine, ['trigT', 'spent', 'blink']], ['B', Barrel, ['fuseT']],
   ['C', Crate, ['type', 'chute', 'sway']], ['G', Grave, ['col']], ['L', Lava, ['life', 'stuck']], ['V', Volcano, ['t']],
@@ -3210,6 +3332,7 @@ function applySnap(s) {
   if (Math.abs(g.time - s.tm) > 0.5) g.time = s.tm;
   if (s.am) s.am.forEach((a, i) => { if (g.teams[i]) g.teams[i].ammo = a; });
   if (s.dm) s.dm.forEach((d, i) => { if (g.teams[i]) { g.teams[i].dmg = d[0]; g.teams[i].kills = d[1]; } });
+  if (s.us) s.us.forEach((u, i) => { if (g.teams[i]) g.teams[i].used = u; });
   const byId = new Map(g.critters.map(c => [c.id, c]));
   for (const a of s.c) {
     let c = byId.get(a[0]);
@@ -3246,7 +3369,7 @@ function guestTick(dt) {
     const tx = e._nx + (e.vx || 0) * age, ty = e._ny + (e.vy || 0) * age;
     if (Math.abs(tx - e.x) > 150 || Math.abs(ty - e.y) > 150) { e.x = tx; e.y = ty; } else { e.x += (tx - e.x) * k; e.y += (ty - e.y) * k; }
   };
-  for (const c of g.critters) if (c.alive) { glide(c); c.eyes(dt); c.trail(); }
+  for (const c of g.critters) if (c.alive) { glide(c); c.anim(dt); c.eyes(dt); c.trail(); }
   for (const e of g.ents) { glide(e); if (e.trail && e.x !== undefined) e.trail(); }
   updateFx(dt);
   if (g.overT > 0 && (g.overT -= dt) <= 0) UI.showOver();
@@ -3327,6 +3450,85 @@ const Full = {
     } catch (e) { }
   },
 };
+
+// ============================== PROFILE + LEADERBOARD ==============================
+// One profile per device: a random id + secret in localStorage, a display name, and
+// match results pushed to Supabase through two RPCs (cc_set_name, cc_report_match).
+// Results that fail to send (offline) are queued and retried on the next boot.
+const Profile = {
+  KEY: 'cc_profile', QKEY: 'cc_profile_queue', data: null, nameT: 0,
+  load() {
+    if (this.data) return this.data;
+    try { this.data = JSON.parse(localStorage.getItem(this.KEY)); } catch (e) { this.data = null; }
+    if (!this.data || !this.data.id || !this.data.secret) { this.data = { id: this.uuid(), secret: this.uuid() + this.uuid().slice(0, 8), name: '' }; this.save(); }
+    return this.data;
+  },
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { } },
+  uuid() { return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : r & 3 | 8).toString(16); }); },
+  name() { const d = this.load(); return (d.name || (settings.teams[0] && settings.teams[0].name) || 'Friend').trim().slice(0, 20) || 'Friend'; },
+  setName(n) {
+    this.load().name = String(n).slice(0, 20); this.save();
+    clearTimeout(this.nameT); this.nameT = setTimeout(() => this.rpc('cc_set_name', { p_id: this.data.id, p_secret: this.data.secret, p_name: this.name() }).catch(() => { }), 900);
+  },
+  async rpc(fn, body) {
+    const r = await fetch(`${SUPA.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: SUPA.key, Authorization: `Bearer ${SUPA.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(`${fn}: HTTP ${r.status}`);
+  },
+  // Which teams are "mine"? Online: the one I control. Local: every human team, but only
+  // when there is an AI to beat (hot-seat between friends is not a ranked result).
+  myTeams() {
+    if (g.online) return Net.myTeam >= 0 && g.teams[Net.myTeam] ? [g.teams[Net.myTeam]] : [];
+    return g.teams.some(t => t.ai) ? g.teams.filter(t => !t.ai) : [];
+  },
+  report() {
+    if (g.reported) return; g.reported = true;
+    const mine = this.myTeams(); if (!mine.length) { $('overProfile').textContent = ''; return; }
+    const d = this.load(), won = !!g.winner && mine.includes(g.winner);
+    const weapons = {}; for (const t of mine) for (const k in (t.used || {})) weapons[k] = (weapons[k] || 0) + t.used[k];
+    const body = { p_id: d.id, p_secret: d.secret, p_name: this.name(), p_won: won, p_online: !!g.online,
+      p_map: g.mapStyle || Terrain.style || '', p_theme: g.theme || Terrain.themeName || '', p_scheme: g.schemeName || '',
+      p_teams: g.teams.length, p_kills: mine.reduce((a, t) => a + t.kills, 0), p_damage: Math.round(mine.reduce((a, t) => a + t.dmg, 0)), p_weapons: weapons };
+    $('overProfile').textContent = `${won ? 'Win' : 'Loss'} recorded for ${this.name()}.`;
+    this.send(body);
+  },
+  send(body) {
+    this.rpc('cc_report_match', body).then(() => this.flush()).catch(() => this.queue(body));
+  },
+  queue(body) { try { const q = JSON.parse(localStorage.getItem(this.QKEY) || '[]'); q.push(body); localStorage.setItem(this.QKEY, JSON.stringify(q.slice(-20))); } catch (e) { } },
+  flush() {
+    let q = []; try { q = JSON.parse(localStorage.getItem(this.QKEY) || '[]'); } catch (e) { }
+    if (!q.length) return;
+    try { localStorage.removeItem(this.QKEY); } catch (e) { }
+    for (const b of q) this.rpc('cc_report_match', b).catch(() => this.queue(b));
+  },
+  async openBoard() {
+    const d = this.load(); $('board').classList.remove('hidden'); if (g.state === 'menu') $('menu').classList.add('hidden');
+    const list = $('boardList'); list.innerHTML = '<p class="small center">Loading…</p>'; $('boardMe').textContent = '';
+    try {
+      const r = await fetch(`${SUPA.url}/rest/v1/cc_leaderboard?select=*&order=wins.desc,games.asc,updated_at.desc&limit=50`, { headers: { apikey: SUPA.key, Authorization: `Bearer ${SUPA.key}` } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const rows = await r.json();
+      const me = rows.find(p => p.id === d.id);
+      $('boardMe').textContent = me ? `You: ${me.wins} win${me.wins === 1 ? '' : 's'} in ${me.games} game${me.games === 1 ? '' : 's'} · ${me.kills} KOs · ${me.damage} damage · favourite: ${this.wname(me.fav_weapon)}` : 'Play a match against the AI or online to get on the board.';
+      if (!rows.length) { list.innerHTML = '<p class="small center">Nobody yet. Be the first!</p>'; return; }
+      const tbl = document.createElement('table'); const head = tbl.insertRow();
+      for (const [h, num] of [['#', 1], ['Player', 0], ['Wins', 1], ['Games', 1], ['Win %', 1], ['Online', 1], ['KOs', 1], ['Damage', 1], ['Favourite', 0]]) { const th = document.createElement('th'); th.textContent = h; if (num) th.className = 'num'; head.appendChild(th); }
+      rows.forEach((p, i) => {
+        const tr = tbl.insertRow(); if (p.id === d.id) tr.className = 'me';
+        const cells = [[i + 1, 1], [p.name, 0], [p.wins, 1], [p.games, 1], [p.games ? Math.round(p.wins / p.games * 100) + '%' : '–', 1], [`${p.online_wins}/${p.online_games}`, 1], [p.kills, 1], [p.damage, 1], [this.wname(p.fav_weapon), 0]];
+        for (const [v, num] of cells) { const td = tr.insertCell(); td.textContent = v; if (num) td.className = 'num'; }
+      });
+      list.innerHTML = ''; list.appendChild(tbl);
+    } catch (e) { list.innerHTML = '<p class="small center">Could not load the leaderboard. Check your connection and try again.</p>'; }
+  },
+  wname(id) { return id && WEAP[id] ? WEAP[id].name : '–'; },
+};
+$('boardBtn').onclick = () => { Sfx.init(); Profile.openBoard(); };
+$('boardClose').onclick = () => { $('board').classList.add('hidden'); if (g.state === 'menu') $('menu').classList.remove('hidden'); };
+$('overBoardBtn').onclick = () => Profile.openBoard();
+$('profName').value = Profile.load().name;
+$('profName').oninput = e => Profile.setName(e.target.value);
+Profile.flush();
 
 // boot
 resize();
