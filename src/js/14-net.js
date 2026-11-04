@@ -43,12 +43,18 @@ const Net = {
     this.leave();
     Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, accepted: false, hostLost: false, lastHost: performance.now(),
       events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0 }, fp: 0, jp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [],
-      pid: this.pid || Math.random().toString(36).slice(2, 10) });
+      pid: this.pid || this.storedPid() });
     // heartbeat on a timer (not the animation loop) so a backgrounded phone tab still counts as present
     this.hbTimer = setInterval(() => { if (this.joined) this.send(this.role === 'host' ? { t: 'hb', host: 1 } : { t: 'hb', pid: this.pid, team: this.myTeam }); }, 2000);
     this.open();
   },
   leave() { clearInterval(this.hbTimer); const ws = this.ws; this.ws = null; this.role = null; this.joined = false; this.started = false; if (ws) try { ws.close(); } catch (e) { } },
+  // The player id survives reloads and closed tabs (localStorage) so a dropped player can rejoin a running game.
+  storedPid() {
+    let pid = ''; try { pid = localStorage.getItem('cc_pid') || ''; } catch (e) { }
+    if (!/^[a-z0-9]{6,12}$/.test(pid)) { pid = Math.random().toString(36).slice(2, 10); try { localStorage.setItem('cc_pid', pid); } catch (e) { } }
+    return pid;
+  },
   peerOf(team) { for (const k in this.peers) if (this.peers[k].team === team) return this.peers[k]; return null; },
   peerList() { return Object.values(this.peers).sort((a, b) => a.team - b.team); },
   // ---- lobby ----
@@ -106,12 +112,16 @@ const Net = {
       const peer = m.pid ? this.peers[m.pid] : null;
       if (peer) { peer.last = now; if (peer.lost && m.t !== 'bye') { peer.lost = false; banner(`${peer.name} is back!`, '#8ecae6'); this.broadcastRoster(); } }
       switch (m.t) {
-        case 'hello':
-          if (peer) { if (this.started && g.state !== 'menu') this.sendInit(m.pid); else this.broadcastRoster(); }
-          else if (this.started || this.peerList().length >= MAX_TEAMS - 1) this.send({ t: 'full', host: 1, to: m.pid });
+        case 'hello': {
+          // a returning player with a new id (cleared storage, other device): hand them the slot of the lost player with the same name
+          const name = String(m.name || 'Friend').slice(0, 18);
+          const lost = !peer && this.started && this.peerList().find(p => p.lost && p.name === name);
+          if (lost) { delete this.peers[lost.pid]; lost.pid = m.pid; lost.lost = false; lost.last = now; this.peers[m.pid] = lost; banner(`${lost.name} is back!`, '#8ecae6'); this.broadcastRoster(); }
+          if (peer || lost) { if (this.started && g.state !== 'menu') this.sendInit(m.pid); else this.broadcastRoster(); }
+          else if (this.started || this.peerList().length >= MAX_TEAMS - 1) this.send({ t: 'full', host: 1, to: m.pid, playing: this.started });
           else { this.peers[m.pid] = { pid: m.pid, team: this.peerList().length + 1, name: String(m.name || 'Friend').slice(0, 18), color: m.color | 0, last: now, lost: false };
             UI.netStatus(`${this.peers[m.pid].name} joined!`); Sfx.pickup(); this.broadcastRoster(); }
-          break;
+          break; }
         case 'in': if (peer && peer.team === m.team) this.remotes[m.team] = m; break;
         case 'w': if (this.guestControls(m)) selectWeapon(m.id); break;
         case 'fz': if (this.guestControls(m) && m.k >= 1 && m.k <= 5) { g.fuse = m.k; g.active.team.fuse = m.k; banner(`Fuse: ${m.k}s`); } break;
@@ -125,7 +135,7 @@ const Net = {
       switch (m.t) {
         case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.setupGuest(m); break;
         case 'roster': this.accepted = true; this.roster = m.list || []; this.renderRoster(); if (!this.started) UI.netStatus(`Joined! ${this.roster.length} in the room – waiting for the host to start…`); break;
-        case 'full': if (m.to === this.pid) { this.accepted = true; UI.netStatus('That room is full or already playing.'); } break;
+        case 'full': if (m.to === this.pid) { this.accepted = true; UI.netStatus(m.playing ? `That game is already in progress. If you were in it, rejoin with the same name you used (${Profile.name()}).` : 'That room is full (8 players).'); } break;
         case 's': if (this.started) { applyEvents(m.ev); applySnap(m); } break;
         case 'chat': if (m.host || m.pid !== this.pid) Chat.add(String(m.n || 'Friend').slice(0, 18), m.c, String(m.x || '').slice(0, 120), false); break;
         case 'bye': if (m.host) { this.hostLost = true; UI.netStatus('The host left the game.'); } break;
