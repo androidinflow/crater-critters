@@ -29,13 +29,13 @@ class Critter extends Body {
       say: null, hurtT: 0, sadT: 0, jumpT: 0, fuel: 0, rope: null, swing: 0, ropeDL: 0, thrust: false, jetX: 0,
       voice: rand(330, 640), seed: rand(0, 10), stillT: 0, dyingT: 0, burnQuipT: 0,
       // animation state (cosmetic): walk blend, idle timer, blink countdown, look-around target, face code + timer
-      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0, frozen: 0, balloon: null });
+      walkT: 0, idleT: 0, blinkT: rand(1, 4), lookT: 0, lookX: 0, lookY: 0, face: 0, faceT: 0, frozen: 0, balloon: null, poison: 0, virus: false, jumped: false });
   }
   busy() { return this.alive && this.mode !== 'ground'; }
   knocked() {
     if (this.frozen > 0) return;   // a block of ice does not budge
     if (this.mode === 'rope' || this.mode === 'jet') this.release();
-    this.mode = 'air'; this.tumble = true; this.fallDmg = true; this.spinV = rand(-18, 18); this.flipV = 0;
+    this.mode = 'air'; this.tumble = true; this.fallDmg = true; this.spinV = rand(-18, 18); this.flipV = 0; this.jumped = false;
   }
   release() {
     if (this.rope) { this.rope.dead = true; this.rope = null; }
@@ -45,11 +45,16 @@ class Critter extends Body {
     if (this.mode !== 'ground') return;
     if (back) { this.vx = CFG.FLIP[0] * this.facing; this.vy = CFG.FLIP[1]; this.flipV = -this.facing * 12.5; }
     else { this.vx = CFG.JUMP[0] * this.facing; this.vy = CFG.JUMP[1]; }
-    this.mode = 'air'; this.fallDmg = true; this.squash = -0.25; this.y -= 1; Sfx.jump(back);
+    this.mode = 'air'; this.fallDmg = true; this.squash = -0.25; this.y -= 1; this.jumped = true; this.tumble = false; this.spin = 0; Sfx.jump(back);
+  }
+  // a second tap of jump right after take-off turns the hop into a backflip
+  backflip() {
+    if (this.mode !== 'air' || !this.jumped) return;
+    this.vx = CFG.FLIP[0] * this.facing; this.vy = CFG.FLIP[1]; this.flipV = -this.facing * 12.5; Sfx.jump(true);
   }
   speak(t) { this.say = { text: t, t: 2.4 }; Sfx.blip(this.voice, clamp(1 + (t.length / 5 | 0), 1, 5)); }
   walk(dir, dt) {
-    this.walking = true; this.walkAcc += CFG.WALK * dt; this.walkPh += dt * 16;
+    this.walking = true; this.walkAcc += CFG.WALK * (g.walkMul || 1) * dt; this.walkPh += dt * 16 * (g.walkMul || 1);
     while (this.walkAcc >= 1) {
       this.walkAcc -= 1;
       const r = walkStep(this, dir);
@@ -71,6 +76,8 @@ class Critter extends Body {
         break;
       case 'air':
         if (circleHits(this.x, this.y, this.r)) pushOut(this);
+        // a controlled jump hugs walls and ceilings instead of bouncing off them; only a tumble bounces
+        this.bounce = this.tumble ? 0.32 : 0.02; this.friction = this.tumble ? 0.25 : 0.04;
         moveBody(this, dt);
         this.spin += (this.tumble ? this.spinV : this.flipV) * dt;
         if (this.hit) this.onHit(this.hit);
@@ -81,6 +88,7 @@ class Critter extends Body {
       case 'rope': this.ropePhysics(dt); break;
       case 'jet': this.jetPhysics(dt); break;
       case 'float': this.floatPhysics(dt); break;
+      case 'chute': this.chutePhysics(dt); break;
     }
     this.eyes(dt); localFx(this);
     if (this.y > g.waterY - 2) killCritter(this, 'water');
@@ -93,14 +101,14 @@ class Critter extends Body {
     } else if (this.tumble && h.speed > 110) { this.squash = 0.18; this.spinV *= -0.6; if (h.speed > 200) { Sfx.thud(); dustFx(this.x, this.y + this.r, 3); } }
   }
   land(speed) {
-    this.mode = 'ground'; this.vx = this.vy = 0; this.tumble = false; this.spin = 0; this.spinV = 0; this.flipV = 0; this.stillT = 0;
+    this.mode = 'ground'; this.vx = this.vy = 0; this.tumble = false; this.spin = 0; this.spinV = 0; this.flipV = 0; this.stillT = 0; this.jumped = false; this.jetX = 0;
     this.squash = Math.min(0.42, speed / 700); settle(this);
     if (speed > 160) { Sfx.thud(); dustFx(this.x, this.y + this.r, 5); }
   }
   ropePhysics(dt) {
     const R = this.rope; if (!R) { this.mode = 'air'; return; }
     R.len = clamp(R.len + this.ropeDL * 150 * dt, 18, 420);
-    this.vy += CFG.G * dt;
+    this.vy += CFG.G * (g.gravMul || 1) * dt;
     let dx = this.x - R.tx, dy = this.y - R.ty, d = Math.hypot(dx, dy) || 1;
     // tangent of the swing circle, oriented so +1 pumps toward screen-right
     let tx = -dy / d, ty = dx / d; if (tx < 0) { tx = -tx; ty = -ty; }
@@ -138,6 +146,14 @@ class Critter extends Body {
     }
   }
   // Party Balloon: drift up and with the wind until the balloon pops, then drop like a stone
+  // Dandelion Chute: a slow, wind-blown descent you can steer a little with ←→; lands softly
+  chutePhysics(dt) {
+    this.vy = Math.min(this.vy + CFG.G * (g.gravMul || 1) * dt, 58); this.vx += (g.wind * 140 + this.jetX * 70 - this.vx) * Math.min(1, 2.5 * dt);
+    let nx = this.x + this.vx * dt, ny = this.y + this.vy * dt;
+    if (circleHits(nx, this.y, this.r)) { this.vx = 0; nx = this.x; }
+    if (circleHits(nx, ny, this.r)) { this.x = nx; this.land(0); return; }
+    this.x = nx; this.y = ny;
+  }
   floatPhysics(dt) {
     const B = this.balloon;
     if (!B || B.dead) { this.balloon = null; this.mode = 'air'; this.fallDmg = true; this.tumble = true; this.spinV = rand(-9, 9); return; }
@@ -175,20 +191,21 @@ class Critter extends Body {
 }
 
 class Mine extends Body {
-  constructor(x, y, dud) { super(x, y, 5); Object.assign(this, { dud, trigT: -1, spent: false, bounce: 0.3, friction: 0.4, blink: rand(0, 2) }); }
+  constructor(x, y, dud, big = false) { super(x, y, big ? 8 : 5); Object.assign(this, { dud, big, armT: big ? 3 : 0, trigT: -1, spent: false, bounce: 0.3, friction: 0.4, blink: rand(0, 2) }); }
   busy() { return !this.rest || this.trigT >= 0; }
-  trigger(t = 1.4) { if (this.trigT < 0 && !this.spent) this.trigT = t; }
+  trigger(t = 1.4) { if (this.trigT < 0 && !this.spent && this.armT <= 0) this.trigT = t; }
   update(dt) {
     this.physics(dt); this.blink += dt;
-    if (!this.spent) {
+    if (this.armT > 0) { this.armT -= dt; if (this.armT <= 0) { Sfx.beep(); addText(this.x, this.y - 14, 'armed', '#ff6b6b', 11, 0.8); } }
+    if (!this.spent && this.armT <= 0) {
       if (this.trigT < 0) {
-        if (g.minesLive) for (const c of g.critters) if (c.alive && Math.hypot(c.x - this.x, c.y - this.y) < 36) { this.trigger(); break; }
+        if (g.minesLive) for (const c of g.critters) if (c.alive && Math.hypot(c.x - this.x, c.y - this.y) < (this.big ? 44 : 36)) { this.trigger(); break; }
       } else {
         this.trigT -= dt; if ((this.trigT * 8 | 0) !== ((this.trigT + dt) * 8 | 0)) Sfx.beep();
         if (this.trigT <= 0) {
           if (this.dud) { this.spent = true; this.trigT = -1; Sfx.dud(); addText(this.x, this.y - 16, 'dud!', '#ccc', 16);
             for (let i = 0; i < 6; i++) P({ kind: 'smoke', x: this.x, y: this.y - 3, vx: rand(-20, 20), vy: rand(-50, -20), g: 0, drag: 0.96, size: rand(3, 6), life: 1.2, col: '#888' }); }
-          else { this.dead = true; explode(this.x, this.y, 46, 42); return; }
+          else { this.dead = true; explode(this.x, this.y, this.big ? 90 : 46, this.big ? 85 : 42); return; }
         }
       }
     }
@@ -266,20 +283,47 @@ const PROJ = {
   vortex:   { r: 6, bounce: 0.3,  friction: 0.3,  windF: 0,    fuse: true,   R: 30, dmg: 18 },
   frog:     { r: 6, bounce: 0.2,  friction: 0.5,  windF: 0,    R: 42, dmg: 40, hop: true },
   seed:     { r: 3, bounce: 0.35, friction: 0.4,  windF: 0.1,  R: 0,  dmg: 0,  plant: true },
+  // --- the newer arsenal. nanas/shards/stars: fragments spawned on burst; fire/gas: lava blobs / stink puffs on burst;
+  //     remote: fire again to detonate; multi: extra bangs before the last one; maxAge: burst after N s regardless
+  banana:   { r: 6, bounce: 0.5,  friction: 0.15, windF: 0,    fuse: true,   R: 40, dmg: 35, nanas: 5 },
+  nana:     { r: 4, bounce: 0.55, friction: 0.1,  windF: 0,    fuse: true,   R: 44, dmg: 40 },
+  superbanana: { r: 7, bounce: 0.5, friction: 0.15, windF: 0,              R: 55, dmg: 55, nanas: 6, remote: true, maxAge: 10 },
+  holy:     { r: 7, bounce: 0.05, friction: 0.9,  windF: 0,    fuse: true,   R: 100, dmg: 100 },
+  glaunch:  { r: 4, bounce: 0.45, friction: 0.2,  windF: 0,    fuse: true,   R: 46, dmg: 44, fuseT: 2 },
+  molotov:  { r: 5, bounce: 0,    friction: 0,    windF: 0.05, impact: true, R: 22, dmg: 16, fire: 10 },
+  gascan:   { r: 5, bounce: 0.3,  friction: 0.3,  windF: 0,    fuse: true,   R: 18, dmg: 8,  gas: 18, fuseT: 2 },
+  waterballoon: { r: 7, bounce: 0, friction: 0,   windF: 0.1,  impact: true, R: 0,  dmg: 0,  splash: true },
+  teapot:   { r: 8, bounce: 0.1,  friction: 0.6,  windF: 0,    fuse: true,   R: 58, dmg: 55, shards: 7 },
+  shard:    { r: 3, bounce: 0,    friction: 0,    windF: 0.2,  impact: true, R: 24, dmg: 20 },
+  battery:  { r: 4, bounce: 0.5,  friction: 0.2,  windF: 0,    fuse: true,   R: 24, dmg: 16, multi: 2, fuseT: 2 },
+  starburst:{ r: 5, bounce: 0,    friction: 0,    windF: 0.1,  fuse: true,   R: 20, dmg: 12, stars: 6, fuseT: 1.1 },
+  star:     { r: 3, bounce: 0,    friction: 0,    windF: 0.3,  impact: true, R: 28, dmg: 24 },
+  fridge:   { r: 10, bounce: 0.15, friction: 0.05, windF: 0,   fuse: true,   R: 40, dmg: 30, roll: true, heavy: true, fuseT: 7 },
+  molebomb: { r: 5, bounce: 0,    friction: 0,    windF: 0,    impact: true, R: 50, dmg: 50, mole: true },
+  arrow:    { r: 3, bounce: 0,    friction: 0,    windF: 0.15, impact: true, R: 0,  dmg: 15, arrow: true },
+  parrow:   { r: 3, bounce: 0,    friction: 0,    windF: 0.15, impact: true, R: 0,  dmg: 10, arrow: true, poison: 3 },
+  magic:    { r: 4, bounce: 0,    friction: 0,    windF: 0,    impact: true, R: 40, dmg: 50, grav: 0, ghost: true, home: true, maxAge: 6 },
+  fireball: { r: 6, bounce: 0,    friction: 0,    windF: 0,    impact: true, R: 16, dmg: 30, grav: 0, maxAge: 0.4, knockMul: 3 },
+  comet:    { r: 9, bounce: 0,    friction: 0,    windF: 0,    impact: true, R: 80, dmg: 70, fire: 8 },
+  rug:      { r: 5, bounce: 0.6,  friction: 0.1,  windF: 0,    fuse: true,   R: 40, dmg: 36, fuseT: 2.5 },
+  c4:       { r: 5, bounce: 0.1,  friction: 0.6,  windF: 0,                  R: 72, dmg: 70, remote: true, maxAge: 15 },
 };
+PROJ.launcher = PROJ.glaunch;   // the AI simulates by weapon id
 PROJ.mortar = PROJ.shell;   // lets the AI simulate a mortar shot
 class Proj extends Body {
   constructor(type, x, y, vx, vy, o = {}) {
     super(x, y, PROJ[type].r);
-    Object.assign(this, PROJ[type], { type, vx, vy, age: 0, important: type !== 'frag', owner: o.owner, fuseT: o.fuse ?? (type === 'dynamite' ? 5 : type === 'acorn' ? 4 : type === 'bowling' ? 6 : type === 'vortex' ? 1.5 : 3),
-      hitSet: null,
+    Object.assign(this, PROJ[type], { type, vx, vy, age: 0, important: type !== 'frag', owner: o.owner, fuseT: o.fuse ?? (PROJ[type].fuseT ?? (type === 'dynamite' ? 5 : type === 'acorn' ? 4 : type === 'bowling' ? 6 : type === 'vortex' ? 1.5 : 3)),
+      hitSet: null, home: !!(o.home || PROJ[type].home), life: 25, dig: null,
       target: o.target, stuck: false, armT: 2, trigT: -1, spin: 0 });
   }
-  busy() { return !(this.type === 'sticky' && this.stuck && this.armT <= 0 && this.trigT < 0); }
+  busy() { return !(this.type === 'sticky' && this.stuck && this.armT <= 0 && this.trigT < 0) && !(this.arrow && this.stuck); }
   update(dt) {
     this.age += dt;
     const t = this.type;
-    if (t === 'bee') this.steer(dt);
+    if (this.arrow && this.stuck) { if ((this.life -= dt) <= 0 || !circleHits(this.x, this.y, this.r + 2)) this.dead = true; return; }
+    if (this.dig) return this.digLogic(dt);
+    if (t === 'bee' || this.home) this.steer(dt);
     if (this.curve) this.curveBack(dt);
     localFx(this);
     if (this.stuck) { // sticky mine glued to the terrain
@@ -291,30 +335,44 @@ class Proj extends Body {
       }
       return this.checkBounds();
     }
-    if (this.rest) { if (!circleHits(this.x, this.y + 1.5, this.r)) this.rest = false; }
+    if (this.ghost) { this.x += this.vx * dt; this.y += this.vy * dt; this.hit = null; }   // Magic Acorn: terrain is no obstacle
+    else if (this.rest) { if (!circleHits(this.x, this.y + 1.5, this.r)) this.rest = false; }
     else { if (circleHits(this.x, this.y, this.r) && !this.impact) pushOut(this); moveBody(this, dt); }
     if (this.hit) {
+      if (this.mole) { const sp = Math.hypot(this.vx, this.vy) || 1; this.dig = { dx: this.vx / sp, dy: this.vy / sp, trav: 0, acc: 0 }; this.vx = this.vy = 0; Sfx.drill(); return; }
+      if (this.arrow) { this.stuck = true; this.vx = this.vy = 0; this.important = false; Sfx.clack(); return; }
       if (this.impact) return this.boom();
       if (this.sticky) { this.stuck = true; this.vx = this.vy = 0; Sfx.tone(300, 0.08, 'square', 0.1, 140); }
       else { if (this.hit.speed > 90) Sfx.clack(); if (this.hit.ny < -0.5 && Math.hypot(this.vx, this.vy) < 30) { this.rest = true; this.vx = this.vy = 0; settle(this); } }
     }
-    if (this.impact && this.age > 0.05) for (const c of g.critters)
+    if (this.impact && (this.age > 0.05 || this.arrow)) for (const c of g.critters)
       if (c.alive && (c !== this.owner || this.age > 0.3) && (c.x - this.x) ** 2 + (c.y - this.y) ** 2 < (c.r + this.r) ** 2) {
         if (this.curve && c === this.owner) { this.dead = true; addText(c.x, c.y - 30, 'Caught!', '#fff', 16, 1); Sfx.clack(); return; }   // boomerang comes home
-        return this.boom();
+        return this.boom(c);
       }
     if (this.roll) { // bowling ball: bowls over anyone it touches, keeps rolling
       const sp = Math.hypot(this.vx, this.vy);
       if (sp > 40) for (const c of g.critters) if (c.alive && c !== this.owner && !(this.hitSet && this.hitSet.has(c)) && (c.x - this.x) ** 2 + (c.y - this.y) ** 2 < (c.r + this.r + 2) ** 2) {
-        (this.hitSet ||= new Set()).add(c); hurt(c, Math.round(14 + Math.min(16, sp / 25))); c.vx += Math.sign(this.vx || 1) * 280; c.vy -= 200; c.knocked(); this.vx *= 0.75; Sfx.thud();
+        (this.hitSet ||= new Set()).add(c); hurt(c, this.heavy ? Math.round(30 + Math.min(30, sp / 15)) : Math.round(14 + Math.min(16, sp / 25))); c.vx += Math.sign(this.vx || 1) * (this.heavy ? 340 : 280); c.vy -= 200; c.knocked(); this.vx *= 0.75; Sfx.thud();
       }
       if (this.rest && this.fuseT > 1) this.fuseT = 1;   // stopped: pop soon
     }
     if (this.hop) { this.hopLogic(dt); if (this.dead) return; }
     if (this.plant && this.rest) { this.dead = true; const m = spawn(new Mine(this.x, this.y - 2, false)); m.rest = true; Sfx.tick(); addText(this.x, this.y - 14, 'armed', '#ff6b6b', 11, 0.8); return; }
     if (this.fuse && (this.fuseT -= dt) <= 0) return this.boom();
+    if (this.maxAge && this.age > this.maxAge) return this.boom();
     this.spin += this.vx * dt * 0.06;
     this.checkBounds();
+  }
+  // Mole Bomb: burrow on along the direction it hit the ground, then burst (or pop out the other side and keep flying)
+  digLogic(dt) {
+    const D = this.dig, step = 170 * dt; this.x += D.dx * step; this.y += D.dy * step; D.trav += step; D.acc += step;
+    if (D.acc >= 5) { D.acc = 0; Terrain.carve(this.x, this.y, 9, false); }
+    if (Math.random() < 0.5) P({ kind: 'dirt', x: this.x, y: this.y, vx: rand(-100, 100) - D.dx * 60, vy: rand(-150, -20), g: 650, drag: 1, size: rand(1.5, 3), col: pick(Terrain.theme.dirt), life: 0.7 });
+    Sfx.drill();
+    for (const c of g.critters) if (c.alive && c !== this.owner && !(this.hitSet && this.hitSet.has(c)) && Math.hypot(c.x - this.x, c.y - this.y) < c.r + 8) { (this.hitSet ||= new Set()).add(c); hurt(c, 10); c.vx += D.dx * 120; c.vy -= 100; c.knocked(); }
+    if (D.trav > 120 || this.y > g.waterY || this.x < 0 || this.x > CFG.W) return this.boom();
+    if (D.trav > 20 && !Terrain.solid(this.x + D.dx * 10, this.y + D.dy * 10) && !Terrain.solid(this.x, this.y)) { this.dig = null; this.vx = D.dx * 140; this.vy = D.dy * 140; }
   }
   trail() {
     const t = this.type;
@@ -324,6 +382,11 @@ class Proj extends Body {
     if (t === 'meteor') P({ kind: 'fire', x: this.x + rand(-3, 3), y: this.y - 4, vx: -this.vx * 0.1, vy: -this.vy * 0.1, g: 0, drag: 0.9, size: rand(4, 7), life: 0.3 });
     if (t === 'vortex' && Math.random() < 0.5) P({ kind: 'spark', x: this.x, y: this.y, vx: rand(-60, 60), vy: rand(-60, 60), g: 0, drag: 0.9, size: 1.5, life: 0.3, col: '#c77dff' });
     if (t === 'bowling' && this.rest === false && Math.random() < 0.4) dustFx(this.x, this.y + 6, 1);
+    if ((t === 'holy' || t === 'magic') && Math.random() < 0.5) P({ kind: 'spark', x: this.x + rand(-6, 6), y: this.y + rand(-6, 6), vx: rand(-20, 20), vy: rand(-40, 0), g: 0, drag: 0.95, size: 2, life: 0.5, col: t === 'holy' ? '#ffe066' : '#c77dff' });
+    if ((t === 'comet' || t === 'star' || t === 'fireball') && Math.random() < 0.9) P({ kind: 'fire', x: this.x + rand(-3, 3), y: this.y, vx: -this.vx * 0.1, vy: -this.vy * 0.1, g: 0, drag: 0.9, size: t === 'comet' ? rand(6, 11) : rand(3, 6), life: 0.3 });
+    if (t === 'starburst' && Math.random() < 0.8) P({ kind: 'spark', x: this.x, y: this.y, vx: -this.vx * 0.2 + rand(-30, 30), vy: -this.vy * 0.2, g: 100, drag: 0.95, size: 2, life: 0.4, col: pick(['#ffd23f', '#ff7b39', '#fff']) });
+    if ((t === 'molotov' || t === 'gascan') && Math.random() < 0.3) P({ kind: 'smoke', x: this.x, y: this.y - 4, vx: rand(-10, 10), vy: -20, g: 0, drag: 0.97, size: rand(2, 4), life: 0.5, col: t === 'gascan' ? '#8ac926' : '#f55' });
+    if (t === 'c4' && (g.time * 4 | 0) % 2 && Math.random() < 0.5) P({ kind: 'spark', x: this.x + rand(-4, 4), y: this.y - 4, vx: rand(-30, 30), vy: rand(-60, -20), g: 150, drag: 0.95, size: 1.5, life: 0.3, col: '#ff2' });
   }
   hopLogic(dt) {   // Hopper Frog: sits, then springs toward the nearest enemy; bursts on touch or after four hops
     if (this.age > 9) return this.boom();
@@ -348,17 +411,48 @@ class Proj extends Body {
     Sfx.swoosh();
   }
   steer(dt) {
-    if (Sfx.ok()) Sfx.buzz();
-    if (this.age < 0.35 || !this.target) return;
-    if (this.age > 5.5) { this.grav = 1; return; }   // bee gets tired and drops
-    this.grav = 0.12;
-    const dx = this.target.x - this.x, dy = this.target.y - this.y, d = Math.hypot(dx, dy) || 1, sp = 430;
-    const k = Math.min(1, 3.2 * dt); this.vx += (dx / d * sp - this.vx) * k; this.vy += (dy / d * sp - this.vy) * k;
+    if (this.type === 'bee' && Sfx.ok()) Sfx.buzz();
+    if (this.age < (this.ghost ? 0.1 : 0.35) || !this.target) return;
+    if (this.age > 5.5 && !this.ghost) { this.grav = 1; return; }   // bee gets tired and drops
+    if (this.target.alive === false) { this.target = null; return; }
+    this.grav = this.ghost ? 0 : 0.12;
+    const dx = this.target.x - this.x, dy = this.target.y - this.y, d = Math.hypot(dx, dy) || 1, sp = this.ghost ? Math.min(260, 80 + d * 2) : 430;
+    const k = Math.min(1, (this.ghost ? 9 : 3.2) * dt); this.vx += (dx / d * sp - this.vx) * k; this.vy += (dy / d * sp - this.vy) * k;
   }
-  boom() {
+  boom(victim) {
+    if (this.arrow) {   // arrows do not explode: a direct hit hurts, a miss sticks
+      this.dead = true; if (!victim) return;
+      hurt(victim, this.dmg); victim.vx += this.vx * 0.25; victim.vy += this.vy * 0.25 - 60; victim.knocked();
+      if (this.poison) poisonCritter(victim, this.poison);
+      for (let k = 0; k < 8; k++) P({ kind: 'spark', x: this.x, y: this.y, vx: rand(-120, 120), vy: rand(-120, 40), g: 300, drag: 0.95, size: 2, life: 0.3 });
+      return;
+    }
+    if (this.multi > 0) {   // Dodgy Battery: bang, hop somewhere else, bang again…
+      this.multi--; explode(this.x, this.y, this.R, this.dmg, { ignore: this });
+      this.rest = false; this.vx = rand(-150, 150); this.vy = -rand(180, 280); this.fuseT = rand(0.45, 0.9); this.y -= 3; this.stuck = false; return;
+    }
     this.dead = true;
     if (this.type === 'vortex') { spawn(new Vortex(this.x, this.y)); return; }
-    explode(this.x, this.y, this.R, this.dmg);
+    if (this.splash) {   // Water Balloon: a big wet shove that puts fires out
+      splashFx(this.x, this.y, 1.6); Sfx.splash(); douse(this.x, this.y, 90);
+      explode(this.x, this.y, 70, 0, { noCarve: true, knock: 1.5 }); return;
+    }
+    if (this.type === 'holy') { Sfx.choir(); P({ kind: 'flash', x: this.x, y: this.y, r: 220, life: 0.35 }); }
+    explode(this.x, this.y, this.R, this.dmg, this.knockMul ? { knock: this.knockMul, carveMul: 0.4 } : undefined);
+    if (this.nanas) for (let i = 0; i < this.nanas; i++) {
+      const a = -Math.PI / 2 + (i - (this.nanas - 1) / 2) * 0.32 + rand(-0.12, 0.12), sp = rand(200, 330);
+      spawn(new Proj('nana', this.x, this.y - 6, Math.cos(a) * sp, Math.sin(a) * sp, { owner: this.owner, fuse: rand(1.3, 2.4) }));
+    }
+    if (this.shards) for (let i = 0; i < this.shards; i++) {
+      const a = -Math.PI / 2 + (i - (this.shards - 1) / 2) * 0.3 + rand(-0.08, 0.08), sp = rand(260, 380);
+      spawn(new Proj('shard', this.x, this.y - 6, Math.cos(a) * sp, Math.sin(a) * sp, { owner: this.owner }));
+    }
+    if (this.stars) for (let i = 0; i < this.stars; i++) {
+      const a = -Math.PI / 2 + (i - (this.stars - 1) / 2) * 0.42, sp = rand(200, 300);
+      spawn(new Proj('star', this.x, this.y, Math.cos(a) * sp, Math.sin(a) * sp, { owner: this.owner }));
+    }
+    if (this.fire) for (let i = 0; i < this.fire; i++) { const a = -Math.PI / 2 + rand(-1.1, 1.1), sp = rand(80, 260); spawn(new Lava(this.x, this.y - 4, Math.cos(a) * sp, Math.sin(a) * sp)); }
+    if (this.gas) { Sfx.hiss(); for (let i = 0; i < this.gas; i++) { const a = rand(0, 6.28), sp = rand(20, 100); spawn(new GasPuff(this.x + Math.cos(a) * 6, this.y - 6 + Math.sin(a) * 6, Math.cos(a) * sp, Math.sin(a) * sp - 30)); } }
     if (this.type === 'melon') for (let i = 0; i < 5; i++) {
       const a = -Math.PI / 2 + (i - 2) * 0.38 + rand(-0.1, 0.1), s = rand(230, 330);
       spawn(new Proj('frag', this.x, this.y - 6, Math.cos(a) * s, Math.sin(a) * s));
@@ -407,7 +501,7 @@ class GasPuff extends Body {
     if (!Terrain.solid(nx, ny)) { this.x = nx; this.y = ny; } else { this.vx *= -0.3; this.vy = -14; }
     this.r = this.r0 * (1 + Math.min(1, this.age / 1.5)) * (this.life < 1 ? Math.max(0.2, this.life) : 1);
     for (const c of g.critters) if (c.alive && c.gasT !== g.time && Math.hypot(c.x - this.x, c.y - this.y) < c.r + this.r * 0.8) {
-      c.gasT = g.time; c.pending += 7 * dt; c.hurtT = 0.3; c.face = 4; c.faceT = 0.6;
+      c.gasT = g.time; c.pending += 7 * dt; c.hurtT = 0.3; c.face = 4; c.faceT = 0.6; if (c.poison < 2) poisonCritter(c, 2, true);
       if (c.burnQuipT <= 0) { c.speak(pick(QUIPS.gas)); c.burnQuipT = 2.5; }
       if (c === g.active && g.state === 'turn' && g.controlling) endControl();
     }
@@ -544,37 +638,61 @@ class Volcano {
   }
 }
 
+// Walking critters: the wind-up robot and its animal cousins. charge: burst on touching an enemy;
+// ram: shove + hurt on touch and keep going; flip: bounce straight off walls; plow: dig through them; hoppy: random hops
+const ANIMALS = {
+  robot:  { speed: 60,  t: 8,   R: 56, dmg: 55 },
+  cow:    { speed: 95,  t: 6,   R: 48, dmg: 45, charge: true },
+  granny: { speed: 28,  t: 5.5, R: 85, dmg: 85, charge: true },
+  rhino:  { speed: 130, t: 7,   R: 0,  dmg: 0,  ram: 35, flip: true },
+  ferret: { speed: 110, t: 5,   R: 34, dmg: 28, charge: true, hoppy: true },
+  boar:   { speed: 70,  t: 10,  R: 0,  dmg: 0,  ram: 40, plow: true },
+};
 class Robot extends Body {
-  constructor(x, y, dir) { super(x, y, 6); Object.assign(this, { dir, t: 8, mode: 'air', acc: 0, blocked: 0, okRun: 0, important: true, bounce: 0.2, friction: 0.4, legPh: 0 }); }
+  constructor(x, y, dir, kind = 'robot') { super(x, y, kind === 'boar' ? 9 : 6); const K = ANIMALS[kind]; Object.assign(this, { kind, dir, t: K.t, mode: 'air', acc: 0, blocked: 0, okRun: 0, important: true, bounce: 0.2, friction: 0.4, legPh: 0, hitSet: null, owner: null, plowAcc: 0 }); }
   busy() { return true; }
   update(dt) {
+    const K = ANIMALS[this.kind];
     if ((this.t -= dt) <= 0) return this.boom();
-    if ((this.t * 4 | 0) !== ((this.t + dt) * 4 | 0)) Sfx.tick();
+    if (this.kind === 'robot' && (this.t * 4 | 0) !== ((this.t + dt) * 4 | 0)) Sfx.tick();
+    if (K.charge || K.ram) for (const c of g.critters) if (c.alive && c !== this.owner && Math.hypot(c.x - this.x, c.y - this.y) < c.r + this.r + 2) {
+      if (K.charge) return this.boom();
+      if (!(this.hitSet ||= new Set()).has(c)) { this.hitSet.add(c); hurt(c, K.ram); c.vx += this.dir * 330; c.vy -= 200; c.knocked(); Sfx.thud(); shake(4); }
+    }
     if (this.mode === 'air') {
       moveBody(this, dt);
       if (this.hit && this.hit.ny < -0.5) { this.mode = 'walk'; this.vx = this.vy = 0; settle(this); }
     } else if (!circleHits(this.x, this.y + 2, this.r)) this.mode = 'air';
     else {
-      this.acc += 60 * dt; this.legPh += dt * 18;
+      if (K.plow) { this.plowAcc += K.speed * dt; if (this.plowAcc > 6) { this.plowAcc = 0; Terrain.carve(this.x + this.dir * 12, this.y - 10, 13, false); /* tunnel ahead, floor left intact */ Sfx.drill(); if (Math.random() < 0.7) P({ kind: 'dirt', x: this.x + this.dir * 10, y: this.y, vx: rand(-80, 80) + this.dir * 60, vy: rand(-180, -40), g: 650, drag: 1, size: rand(1.5, 3.5), col: pick(Terrain.theme.dirt), life: 0.8 }); } }
+      if (K.hoppy && Math.random() < dt * 1.4) { this.mode = 'air'; this.vy = -230; this.vx = this.dir * 90; this.y -= 1; Sfx.boing(); }
+      this.acc += K.speed * dt; this.legPh += dt * 18;
       while (this.acc >= 1) {
         this.acc--;
         const r = walkStep(this, this.dir);
         if (r === 'wall') {
-          if (++this.blocked >= 3) { this.dir *= -1; this.blocked = 0; } else { this.mode = 'air'; this.vy = -210; this.vx = this.dir * 70; this.y -= 1; }
+          if (K.plow) { Terrain.carve(this.x + this.dir * 8, this.y - 6, 16, false); this.blocked = 0; }           // the boar simply eats the wall
+          else if (K.flip) { this.dir *= -1; Sfx.thud(); dustFx(this.x, this.y + this.r, 3); }                   // the rhino bounces straight off
+          else if (++this.blocked >= 3) { if (K.charge) return this.boom(); this.dir *= -1; this.blocked = 0; }   // a charging animal gives up with a bang rather than turning on its owner
+          else { this.mode = 'air'; this.vy = -210; this.vx = this.dir * 70; this.y -= 1; }
           this.acc = 0; break;
         }
-        if (r === 'fall') { this.mode = 'air'; this.vx = this.dir * 60; break; }
+        if (r === 'fall') { this.mode = 'air'; this.vx = this.dir * K.speed; break; }
         if (++this.okRun > 20) { this.blocked = 0; this.okRun = 0; }
       }
     }
     this.checkBounds();
   }
-  boom() { this.dead = true; explode(this.x, this.y, 56, 55); }
+  boom() {
+    this.dead = true; const K = ANIMALS[this.kind];
+    if (K.R) explode(this.x, this.y, K.R, K.dmg);
+    else { dustFx(this.x, this.y + this.r, 6); addText(this.x, this.y - 14, pick(['tired!', 'phew.', 'done.']), '#fff', 12, 1); }
+  }
   onBlast(f, nx, ny) { this.push(f, nx, ny); this.mode = 'air'; }
 }
 
 class Anvil {
-  constructor(x) { Object.assign(this, { x, y: Terrain.cavern ? 0 : -60, vx: 0, vy: 260, r: 12, depth: 0, hitSet: new Set(), dead: false, important: true }); Sfx.whoosh(); }
+  constructor(x, kind = 'anvil') { Object.assign(this, { x, kind, y: Terrain.cavern ? 0 : -60, vx: 0, vy: kind === 'buster' ? 420 : 260, r: kind === 'buster' ? 7 : 12, depth: 0, hitSet: new Set(), dead: false, important: true }); Sfx.whoosh(); }
   busy() { return true; }
   update(dt) {
     this.vy += CFG.G * dt;
@@ -586,20 +704,24 @@ class Anvil {
         this.depth += this.vy * dt / steps; this.vy = Math.max(240, this.vy * 0.995);
         if (Math.random() < 0.3) P({ kind: 'dirt', x: this.x + rand(-10, 10), y: this.y - 10, vx: rand(-180, 180), vy: rand(-260, -80), g: 650, drag: 1, size: rand(2, 4), col: pick(['#8a5a34', '#6b4426']), life: 1 });
         shake(3); Sfx.drill();
-        if (this.depth > 230) return this.boom();
+        if (this.depth > (this.kind === 'buster' ? 70 : 230)) return this.boom();
       }
       for (const c of g.critters) if (c.alive && !this.hitSet.has(c) && Math.hypot(c.x - this.x, c.y - this.y) < c.r + this.r) {
-        this.hitSet.add(c); hurt(c, 30); c.vx += (Math.sign(c.x - this.x) || 1) * 320; c.vy = -170; c.knocked(); Sfx.clank();
+        this.hitSet.add(c); hurt(c, this.kind === 'buster' ? 18 : 30); c.vx += (Math.sign(c.x - this.x) || 1) * 320; c.vy = -170; c.knocked(); Sfx.clank();
       }
     }
     if (this.y > g.waterY) { this.dead = true; splashFx(this.x, g.waterY, 2); Sfx.splash(); shake(8); }
   }
-  boom() { this.dead = true; explode(this.x, this.y, 72, 65); }
+  boom() { this.dead = true; if (this.kind === 'buster') explode(this.x, this.y, 55, 55); else explode(this.x, this.y, 72, 65); }
 }
 
+// What each air strike drops: [projectile or 'mine'/'crate', count, homing?]
+const STRIKES = { pelican: ['egg', 5], napalm: ['molotov', 5], minestrike: ['mine', 5], cratestrike: ['crate', 3], poisonstrike: ['gascan', 4], waterstrike: ['waterballoon', 5],
+  frogstrike: ['frog', 3], homingstrike: ['egg', 4, true], molestrike: ['molebomb', 3], carpet: ['rug', 4] };
 class Pelican {
-  constructor(tx) {
-    this.tx = tx; this.dir = Math.random() < 0.5 ? 1 : -1; this.y = 70; this.vx = this.dir * 380; this.drops = 0; this.dead = false; this.important = true; this.flap = 0;
+  constructor(tx, payload = 'pelican', target = null, owner = null) {
+    this.tx = tx; this.payload = payload; this.target = target; this.owner = owner;
+    this.dir = Math.random() < 0.5 ? 1 : -1; this.y = 70; this.vx = this.dir * 380; this.drops = 0; this.dead = false; this.important = true; this.flap = 0;
     // lead the drop: eggs inherit some of the bird's speed, so release early by the expected drift
     let sy = 80; while (sy < g.waterY && !Terrain.solid(tx, sy)) sy += 4;
     const tFall = Math.sqrt(2 * Math.max(50, sy - this.y) / CFG.G);
@@ -610,11 +732,15 @@ class Pelican {
   busy() { return true; }
   update(dt) {
     this.x += this.vx * dt; this.flap += dt * 10;
-    while (this.drops < 5 && (this.x - this.release) * this.dir >= this.drops * 25) {
-      spawn(new Proj('egg', this.x, this.y + 12, this.vx * 0.35, 30)); this.drops++;
+    const [type, n, home] = STRIKES[this.payload] || STRIKES.pelican, gap = n >= 5 ? 25 : 40;
+    while (this.drops < n && (this.x - this.release) * this.dir >= this.drops * gap) {
+      if (type === 'mine') { const m = spawn(new Mine(this.x, this.y + 12, false)); m.vx = this.vx * 0.35; m.vy = 30; }
+      else if (type === 'crate') { const cr = spawn(makeCrate(this.x, this.y + 12)); cr.vx = this.vx * 0.35; }
+      else spawn(new Proj(type, this.x, this.y + 12, this.vx * 0.35, 30, { owner: this.owner, target: home ? this.target : undefined, home }));
+      this.drops++;
       if (this.drops === 1) Sfx.quack();
     }
-    if (this.drops >= 5 && (this.x - this.release) * this.dir > 900) this.dead = true;
+    if (this.drops >= n && (this.x - this.release) * this.dir > 900) this.dead = true;
   }
 }
 

@@ -1,6 +1,6 @@
 // ============================== INPUT ==============================
 const Input = { down: {}, pressed: new Set(), released: new Set(), mx: 0, my: 0, mdown: false, sx: 0, sy: 0, drag: false };
-const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Enter', 'Tab', 'NumpadEnter']);
+const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Enter', 'Tab', 'NumpadEnter', 'Backspace']);
 window.addEventListener('keydown', e => {
   Sfx.init();
   if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
@@ -22,7 +22,7 @@ window.addEventListener('blur', () => { Input.down = {}; });
 function humanInput() {
   const d = Input.down, p = Input.pressed;
   return { left: !!(d.ArrowLeft || d.KeyA), right: !!(d.ArrowRight || d.KeyD), up: !!(d.ArrowUp || d.KeyW), down: !!(d.ArrowDown || d.KeyS),
-    jumpPress: p.has('Enter') || p.has('NumpadEnter'), flip: false, firePress: p.has('Space'), fireHeld: !!d.Space, targetPower: null, isAI: false };
+    jumpPress: p.has('Enter') || p.has('NumpadEnter'), flip: p.has('Backspace'), firePress: p.has('Space'), fireHeld: !!d.Space, targetPower: null, isAI: false };
 }
 function screenToWorld(sx, sy) { return { x: (sx - view.w / 2) / cam.zoom + cam.x, y: (sy - view.h / 2) / cam.zoom + cam.y }; }
 function worldToScreen(x, y) { return { x: (x - cam.x) * cam.zoom + view.w / 2, y: (y - cam.y) * cam.zoom + view.h / 2 }; }

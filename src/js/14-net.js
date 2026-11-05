@@ -17,8 +17,8 @@ function netCopy(v) {
 }
 const Net = {
   role: null, ws: null, code: '', topic: '', ref: 1, joined: false, started: false, accepted: false,
-  pid: '', myTeam: 0, peers: {}, remotes: {}, seen: { fp: 0, jp: 0 }, events: [], log: [], mute: 0,
-  fp: 0, jp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, snapAt: 0, helloT: 0, roster: [],
+  pid: '', myTeam: 0, peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, events: [], log: [], mute: 0,
+  fp: 0, jp: 0, bp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, snapAt: 0, helloT: 0, roster: [],
   // ---- transport ----
   open() {
     const ws = this.ws = new WebSocket(`${SUPA.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SUPA.key}&vsn=1.0.0`);
@@ -42,7 +42,7 @@ const Net = {
   begin(code, role) {
     this.leave();
     Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, accepted: false, hostLost: false, lastHost: performance.now(),
-      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0 }, fp: 0, jp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [],
+      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [],
       pid: this.pid || this.storedPid() });
     // heartbeat on a timer (not the animation loop) so a backgrounded phone tab still counts as present
     this.hbTimer = setInterval(() => { if (this.joined) this.send(this.role === 'host' ? { t: 'hb', host: 1 } : { t: 'hb', pid: this.pid, team: this.myTeam }); }, 2000);
@@ -148,6 +148,7 @@ const Net = {
     if (peer && !peer.lost) { inp.left = !!R.l; inp.right = !!R.r; inp.up = !!R.u; inp.down = !!R.d; inp.fireHeld = !!R.fh; }
     if ((R.fp | 0) > this.seen.fp) { this.seen.fp++; inp.firePress = true; }
     if ((R.jp | 0) > this.seen.jp) { this.seen.jp++; inp.jumpPress = true; }
+    if ((R.bp | 0) > this.seen.bp) { this.seen.bp++; inp.flip = true; }
     return inp;
   },
   ev(code, args) { if (this.role === 'host' && !this.mute) this.events.push([code, ...netCopy(args)]); },
@@ -169,10 +170,11 @@ const Net = {
     if (!blocked) {
       if (p.has('Space')) this.fp++;
       if (p.has('Enter') || p.has('NumpadEnter')) this.jp++;
+      if (p.has('Backspace')) this.bp++;
       for (let k = 1; k <= 5; k++) if (p.has('Digit' + k) || p.has('Numpad' + k)) { this.send({ t: 'fz', k, pid: this.pid, team: this.myTeam }); g.fuse = k; }
     }
     const st = blocked ? { l: 0, r: 0, u: 0, d: 0, fh: 0 } : { l: +!!(d.ArrowLeft || d.KeyA), r: +!!(d.ArrowRight || d.KeyD), u: +!!(d.ArrowUp || d.KeyW), d: +!!(d.ArrowDown || d.KeyS), fh: +!!d.Space };
-    st.fp = this.fp; st.jp = this.jp; st.t = 'in'; st.pid = this.pid; st.team = this.myTeam;
+    st.fp = this.fp; st.jp = this.jp; st.bp = this.bp; st.t = 'in'; st.pid = this.pid; st.team = this.myTeam;
     const key = JSON.stringify(st);
     if (mine && (key !== this.lastIn || (this.inT += real) > 0.3)) { this.send(st); this.lastIn = key; this.inT = 0; }
     p.clear(); Input.released.clear();
@@ -181,7 +183,7 @@ const Net = {
   snap() {
     const t = Net.started ? camTarget() : null;
     return { t: 's', st: g.state, tt: nr(g.turnT), w: nr(g.wind), wp: g.weapon, fu: g.fuse, tg: g.target ? [nr(g.target.x), nr(g.target.y)] : 0,
-      ch: g.charging, pw: nr(g.power), rt: g.retreat, fi: g.fired, lw: g.lockWeapon, ct: g.controlling, ga: nr(g.girderAng), sl: g.shotsLeft, rb: !!g.robot,
+      ch: g.charging, pw: nr(g.power), rt: g.retreat, fi: g.fired, lw: g.lockWeapon, ct: g.controlling, ga: nr(g.girderAng), sl: g.shotsLeft, rb: g.robot ? (g.robot.hint || 1) : 0, ls: !!g.laser, cs: g.teams.map(t => !!t.crateSpy),
       a: g.active ? g.active.id : 0, wy: nr(g.waterY), sd: g.sd, tm: nr(g.time), ts: nr(g.turnStartT), sm: nr(g.slowmo), sh: nr(g.shake), win: g.winner ? g.winner.idx : -1,
       cf: t ? [nr(t.x), nr(t.y)] : 0, am: g.teams.map(t => t.ammo), dm: g.teams.map(t => [Math.round(t.dmg), t.kills]), us: g.teams.map(t => t.used),
       c: g.critters.map(c => [c.id, c.team.idx, c.name, ...CRIT_F.map(f => nr(c[f])), c.say ? [c.say.text, nr(c.say.t)] : 0]),
@@ -199,13 +201,14 @@ const Net = {
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };
-const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT', 'frozen'];
+const CRIT_F = ['x', 'y', 'vx', 'vy', 'facing', 'aim', 'hp', 'pending', 'alive', 'mode', 'squash', 'spin', 'hurtT', 'sadT', 'walking', 'walkPh', 'tumble', 'dyingT', 'fuel', 'thrust', 'face', 'faceT', 'frozen', 'poison'];
 const NET_KINDS = [
-  ['P', Proj, ['type', 'spin', 'fuseT', 'armT', 'trigT', 'stuck']], ['M', Mine, ['trigT', 'spent', 'blink']], ['B', Barrel, ['fuseT']],
-  ['C', Crate, ['type', 'chute', 'sway']], ['G', Grave, ['col']], ['L', Lava, ['life', 'stuck']], ['V', Volcano, ['t']],
-  ['R', Robot, ['dir', 'legPh', 't']], ['A', Anvil, []], ['E', Pelican, ['dir', 'flap']], ['H', Rope, ['cId', 'tx', 'ty', 'state']],
+  ['P', Proj, ['type', 'spin', 'fuseT', 'armT', 'trigT', 'stuck']], ['M', Mine, ['trigT', 'spent', 'blink', 'big', 'armT']], ['B', Barrel, ['fuseT']],
+  ['C', Crate, ['type', 'chute', 'sway', 'content']], ['G', Grave, ['col']], ['L', Lava, ['life', 'stuck']], ['V', Volcano, ['t']],
+  ['R', Robot, ['dir', 'legPh', 't', 'kind']], ['A', Anvil, ['kind']], ['E', Pelican, ['dir', 'flap', 'payload']], ['H', Rope, ['cId', 'tx', 'ty', 'state']],
   ['Q', GasPuff, ['life', 'r']], ['T', Cloud, ['t', 'bolts', 'nextT']], ['D', Drill, ['dx', 'dy']],
   ['X', Vortex, ['t', 'life']], ['S', Shower, ['t', 'n']], ['N', Balloon, ['cId', 't', 'popT']], ['K', Quake, ['t']],
+  ['F', Flyer, ['ang', 't']], ['Y', Sentry, ['ti', 'shots', 'ang', 'hp']], ['U', Pump, ['t']], ['I', Ion, ['t', 'fired']],
 ];
 const NET_KIND = new Map(NET_KINDS.map(([code, cls, f]) => [cls, { code, cls, f }]));
 const NET_CODE = new Map(NET_KINDS.map(([code, cls, f]) => [code, { code, cls, f }]));
@@ -242,13 +245,14 @@ function applyEvents(evs) {
 function applySnap(s) {
   const prevState = g.state;
   Object.assign(g, { state: s.st, turnT: s.tt, wind: s.w, weapon: s.wp, fuse: s.fu, target: s.tg ? { x: s.tg[0], y: s.tg[1] } : null, charging: s.ch, power: s.pw,
-    retreat: s.rt, fired: s.fi, lockWeapon: s.lw, controlling: s.ct, girderAng: s.ga, shotsLeft: s.sl, robot: s.rb ? {} : null, waterY: s.wy, sd: s.sd,
+    retreat: s.rt, fired: s.fi, lockWeapon: s.lw, controlling: s.ct, girderAng: s.ga, shotsLeft: s.sl, robot: s.rb ? { hint: typeof s.rb === 'string' ? s.rb : '' } : null, waterY: s.wy, sd: s.sd, laser: !!s.ls,
     turnStartT: s.ts, slowmo: s.sm, netFocus: s.cf ? { x: s.cf[0], y: s.cf[1] } : null });
   g.shake = Math.max(g.shake, s.sh);
   if (Math.abs(g.time - s.tm) > 0.5) g.time = s.tm;
   if (s.am) s.am.forEach((a, i) => { if (g.teams[i]) g.teams[i].ammo = a; });
   if (s.dm) s.dm.forEach((d, i) => { if (g.teams[i]) { g.teams[i].dmg = d[0]; g.teams[i].kills = d[1]; } });
   if (s.us) s.us.forEach((u, i) => { if (g.teams[i]) g.teams[i].used = u; });
+  if (s.cs) s.cs.forEach((v, i) => { if (g.teams[i]) g.teams[i].crateSpy = v; });
   const byId = new Map(g.critters.map(c => [c.id, c]));
   for (const a of s.c) {
     let c = byId.get(a[0]);
@@ -263,7 +267,7 @@ function applySnap(s) {
     if (!e || !(e instanceof k.cls)) { e = Object.create(k.cls.prototype); e.id = a[1]; e.x = a[2]; e.y = a[3]; e.r = 6; e.dead = false; }
     e._nx = a[2]; e._ny = a[3]; e.vx = a[4]; e.vy = a[5];
     k.f.forEach((f, i) => { e[f] = a[6 + i]; });
-    if (k.cls === Proj) Object.assign(e, PROJ[e.type] ? { r: PROJ[e.type].r, fuse: PROJ[e.type].fuse } : {});
+    if (k.cls === Proj) Object.assign(e, PROJ[e.type] ? { r: PROJ[e.type].r, fuse: PROJ[e.type].fuse, arrow: PROJ[e.type].arrow, remote: PROJ[e.type].remote } : {});
     if (k.cls === Rope || k.cls === Balloon) e.c = byId.get(e.cId) || g.critters.find(c => c.id === e.cId);
     ents.push(e);
   }

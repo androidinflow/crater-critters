@@ -5,7 +5,8 @@ function makeState() {
   return { state: 'menu', time: 0, ents: [], critters: [], teams: [], parts: [], texts: [], tracers: [], wind: 0, waterY: CFG.WATER0, waterTarget: CFG.WATER0,
     shake: 0, banner: null, active: null, teamIdx: -1, turnT: 0, fired: false, retreat: false, charging: false, power: 0, weapon: 'bomb', fuse: 3, target: null,
     robot: null, shotsLeft: 0, shotCD: 0, lockWeapon: false, girderAng: 0, focus: null, ai: null, controlling: false, phase: '', phaseT: 0, quietT: 0, resolveT: 0,
-    sd: false, slowmo: 0, timeScale: 1, minesLive: false, overT: -1, winner: null, turnStartT: 0, settings, nextId: 0, online: false, netFocus: null };
+    sd: false, slowmo: 0, timeScale: 1, minesLive: false, overT: -1, winner: null, turnStartT: 0, settings, nextId: 0, online: false, netFocus: null,
+    gravMul: 1, walkMul: 1, dmgMul: 1, laser: false };
 }
 function startBackdrop() {
   g = makeState(); const seed = Math.random() * 1e9 | 0;
@@ -58,6 +59,7 @@ function thaw(o) {
 }
 function hurt(c, amt) {
   if (!c.alive || amt <= 0) return;
+  if (g.dmgMul && g.dmgMul !== 1) amt = Math.round(amt * g.dmgMul);   // Double Damage
   if (c.frozen > 0) amt = Math.ceil(amt / 2);
   c.pending += amt; c.hurtT = 0.9;
   if (amt >= 25 || c.hp - c.pending <= 0) { c.face = 2; c.faceT = 1.7; } else if (c.faceT <= 0 || c.face === 1) { c.face = 1; c.faceT = 0.9; }   // 2 = dizzy, 1 = ouch
@@ -88,6 +90,12 @@ function startTurn() {
   g.teamIdx = ti; const team = g.teams[ti];
   // ice lasts two of this team's turns; frozen critters are skipped in the rotation
   for (const o of team.critters) if (o.alive && o.frozen > 0) { o.frozen--; if (o.frozen > 0) addText(o.x, o.y - 30, 'still frozen', '#9ad7ff', 14); else thaw(o); }
+  // poison: 5 HP at the start of each of the team's turns (never fatal); a virus also jumps to anyone standing close
+  for (const o of team.critters) if (o.alive && o.poison > 0) {
+    o.poison--; const d = Math.min(5, Math.max(0, o.hp - 1));
+    if (d > 0) { o.hp -= d; addText(o.x, o.y - 34, `-${d} poison`, '#8ac926', 16); o.face = 4; o.faceT = 1.2; Sfx.blip(o.voice * 0.7, 2); }
+    if (o.virus) { if (o.poison > 0) { for (const p of g.critters) if (p.alive && p !== o && p.poison <= 0 && Math.hypot(p.x - o.x, p.y - o.y) < 70) { poisonCritter(p, 3); p.virus = true; addText(p.x, p.y - 44, 'caught the virus!', '#8ac926', 14); } } else o.virus = false; }
+  }
   let ci = team.cIdx, c = null;
   for (let k = 0; k < team.critters.length; k++) {
     ci = (ci + 1) % team.critters.length; const o = team.critters[ci];
@@ -100,14 +108,14 @@ function startTurn() {
     banner('SUDDEN DEATH! Everyone is at 1 HP!', '#ff4d6d'); shake(10); Sfx.sad();
   }
   Object.assign(g, { active: c, state: 'turn', controlling: true, turnT: g.settings.turnTime, fired: false, retreat: false, charging: false, power: 0, target: null,
-    robot: null, shotsLeft: 0, shotCD: 0, lockWeapon: false, focus: null, turnStartT: g.time });
+    robot: null, shotsLeft: 0, shotCD: 0, lockWeapon: false, focus: null, turnStartT: g.time, gravMul: 1, walkMul: 1, dmgMul: 1, laser: false });
   g.wind = rand(-1, 1) * (Math.random() < 0.2 ? 0.2 : 1);
   g.weapon = weaponUsable(team, team.lastWeapon) ? team.lastWeapon : (WEAPONS.find(w => !w.util && weaponUsable(team, w.id)) || WEAP.skip).id;
   g.fuse = team.fuse;
   g.ai = team.ai ? new AIBrain(c) : null;
   if (g.online && Net.role === 'host' && team.idx !== 0) {
     const peer = Net.peerOf(team.idx), R = Net.remotes[team.idx] || {};
-    Net.seen = { fp: R.fp | 0, jp: R.jp | 0 };
+    Net.seen = { fp: R.fp | 0, jp: R.jp | 0, bp: R.bp | 0 };
     if (!peer || peer.lost) { g.ai = new AIBrain(c); g.ai.standIn = true; banner(`${team.name} is away – the AI plays for them`, team.color); }
   }
   cam.manualT = 0;
@@ -119,7 +127,8 @@ function endControl() {
   if (g.state !== 'turn') return;
   const c = g.active;
   g.controlling = false; g.charging = false;
-  if (c && c.alive) { if (c.mode === 'rope' || c.mode === 'jet') c.release(); c.walking = false; c.jumpT = 0; }
+  if (c && c.alive) { if (c.mode === 'rope' || c.mode === 'jet') c.release(); c.walking = false; c.jumpT = 0; c.jetX = 0; }
+  if (g.robot && g.robot.remote && !g.robot.dead) g.robot.boom();   // an unfired Fizz Brick / Mega Banana goes off when the turn ends
   Object.assign(g, { state: 'resolving', phase: 'settle', phaseT: 0, quietT: 0, resolveT: 0, waterDone: false, crateDone: false, forced: false, ai: null });
   if (UI.pickerOpen) UI.togglePicker();
 }
@@ -211,21 +220,30 @@ function updateTurn(dt) {
   }
 }
 function controlActive(c, inp, dt) {
-  // Enter: jump; a second tap within 0.25 s turns it into a backflip
-  if (inp.jumpPress) {
-    if (c.mode === 'rope' || c.mode === 'jet') { c.release(); c.vy -= 120; }
-    else if (c.mode === 'ground') { if (c.jumpT > 0) { c.jumpT = 0; c.doJump(true); } else c.jumpT = inp.isAI ? 0.01 : 0.25; }
-  }
-  if (c.jumpT > 0 && (c.jumpT -= dt) <= 0) { c.jumpT = 0; c.doJump(false); }
   const aimDir = (inp.down ? 1 : 0) - (inp.up ? 1 : 0), mv = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+  // Jump (Enter) goes off at once, in the direction being held. A second tap within 0.3 s of take-off,
+  // or Backspace, turns it into a backflip. (The old quarter-second wait made a jump go the way the
+  // critter *was* facing when Enter was pressed, which is where the "wrong way" jumps came from.)
+  if (inp.jumpPress || inp.flip) {
+    if (c.mode === 'rope' || c.mode === 'jet' || c.mode === 'chute') { const chute = c.mode === 'chute'; c.release(); if (!chute) c.vy -= 120; }
+    else if (c.mode === 'ground' && !g.charging) { if (mv) c.facing = mv; c.doJump(!!inp.flip); c.jumpT = inp.flip ? 0 : 0.3; }
+    else if (c.mode === 'air' && c.jumped && !c.tumble && (inp.flip || c.jumpT > 0)) { c.backflip(); c.jumpT = 0; }
+  }
+  if (c.jumpT > 0) c.jumpT -= dt;
   c.walking = false;
+  if (g.robot && g.robot.turn !== undefined) { g.robot.turn = mv; handleFire(c, inp, dt); return; }   // ←→ steer the Super Squirrel instead of walking
   if (c.mode === 'rope') { c.swing = mv; c.ropeDL = aimDir; }
   else if (c.mode === 'jet') { c.thrust = inp.up; c.jetX = mv; }
+  else if (c.mode === 'chute') c.jetX = mv;
   else {
     if (g.weapon === 'girder' && !g.retreat) g.girderAng = clamp(g.girderAng + aimDir * 1.4 * dt, -1.4, 1.4);
     else c.aim = clamp(c.aim + aimDir * 1.5 * dt, -1.52, 1.52);
-    if (c.mode === 'ground' && !g.charging && mv && c.jumpT <= 0) { c.facing = mv; c.walk(mv, dt); }
-    else if (mv && c.mode === 'air' && !c.tumble) c.facing = mv;
+    if (c.mode === 'ground' && !g.charging && mv) { c.facing = mv; c.walk(mv, dt); }
+    else if (mv && c.mode === 'air' && !c.tumble) {
+      c.facing = mv;
+      // a little air control on your own jumps (not when you have been blown somewhere): bend the arc toward the held direction
+      if (c.jumped) c.vx += (mv * CFG.JUMP[0] - c.vx) * Math.min(1, CFG.AIR_STEER * dt);
+    }
   }
   handleFire(c, inp, dt);
 }

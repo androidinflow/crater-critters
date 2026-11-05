@@ -231,6 +231,11 @@ function drawCritter(x, c, t) {
   else { x.arc(r * 0.55, r * 0.3, 2.6, 0.2, Math.PI - 0.2); x.stroke(); }
   // sweat drop when struggling against a wall or badly hurt
   if ((c.blocked && wk > 0.5) || (lowHp && Math.sin(t * 1.1 + c.seed) > 0.6)) { x.fillStyle = '#9ad7ff'; x.beginPath(); x.ellipse(r * 0.95, -r * 0.75 + (t * 10 % 6), 1.3, 2, 0, 0, 7); x.fill(); }
+  // poisoned: a sickly green tint and the odd bubble
+  if (c.poison > 0) {
+    x.fillStyle = 'rgba(120,200,40,0.28)'; circ(x, 0, 0, r + 1); x.fill();
+    x.fillStyle = 'rgba(190,240,90,0.7)'; for (let i = 0; i < 3; i++) { const q = (t * 0.7 + i * 0.33 + c.seed * 0.1) % 1; circ(x, -r * 0.6 + i * r * 0.6, -r * 1.3 - q * 14, 1.2 + (1 - q) * 1.2); x.fill(); }
+  }
   // frozen: a block of ice around the whole critter
   if (c.frozen > 0) {
     x.globalAlpha = 0.55; x.fillStyle = '#bfe9ff'; x.strokeStyle = '#6cc3ff'; x.lineWidth = 1.5; rr(x, -r * 1.5, -r * 1.75, r * 3, r * 3.3, 3); x.fill(); x.stroke();
@@ -242,9 +247,22 @@ function drawCritter(x, c, t) {
     for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1, sx = Math.cos(a) * r * 1.2, sy = -r * 1.35 + Math.sin(a) * r * 0.35; star(x, sx, sy, 2.4); x.fill(); x.stroke(); }
   }
   x.restore();
+  // Dandelion Chute: a seed-head canopy above the critter (drawn unrotated, in world space)
+  if (c.mode === 'chute') {
+    x.save(); x.translate(c.x, c.y - r - 26); x.rotate(Math.sin(t * 2 + c.seed) * 0.08 + clamp(c.vx / 300, -0.3, 0.3));
+    x.strokeStyle = 'rgba(43,29,18,0.6)'; x.lineWidth = 1; x.beginPath(); for (const px of [-14, -5, 5, 14]) { x.moveTo(px, -2); x.lineTo(0, 26); } x.stroke();
+    x.fillStyle = 'rgba(255,255,255,0.85)'; x.strokeStyle = '#2b1d12'; x.lineWidth = 1.5;
+    x.beginPath(); x.arc(0, 0, 18, Math.PI, 0); x.quadraticCurveTo(9, 4, 0, 0); x.quadraticCurveTo(-9, 4, -18, 0); x.fill(); x.stroke();
+    x.fillStyle = '#ffd23f'; for (let i = 0; i < 7; i++) { circ(x, -15 + i * 5, -8 + Math.sin(i * 1.7) * 4, 1.3); x.fill(); }
+    x.restore();
+  }
 }
 function star(x, cx, cy, s) { x.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? s * 0.45 : s; x.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } x.closePath(); }
 
+const PROJ_SIZE = { melon: 15, frag: 8, acorn: 22, skunk: 14, bowling: 17, vortex: 13, banana: 15, nana: 10, superbanana: 18, holy: 17, glaunch: 11, molotov: 13, gascan: 12,
+  waterballoon: 14, teapot: 17, shard: 7, battery: 11, starburst: 12, star: 8, fridge: 22, rug: 13, c4: 13 };
+const NO_FUSE_TEXT = new Set(['melon', 'bowling', 'vortex', 'fridge', 'starburst']);
+const ANIMAL_ICON = { robot: 'robot', cow: 'cows', granny: 'granny', rhino: 'rhino', ferret: 'ferret', boar: 'boar' };
 function drawEntity(x, e, t) {
   if (e instanceof Critter) return; // drawn in a separate pass
   x.save(); x.translate(e.x, e.y);
@@ -257,8 +275,12 @@ function drawEntity(x, e, t) {
     else if (ty === 'frog') { x.scale(e.vx < 0 ? -1 : 1, 1); if (e.rest) x.scale(1.15, 0.85); else x.scale(0.92, 1.12); drawIcon(x, 'frog', 15); }
     else if (ty === 'shell') { x.rotate(Math.atan2(e.vy, e.vx) + Math.PI / 2); drawIcon(x, 'acorn', 7); }
     else if (ty === 'meteor') { x.rotate(e.spin); drawIcon(x, 'meteor', 13); }
-    else { x.rotate(e.spin); drawIcon(x, ty === 'frag' ? 'frag' : ty, ty === 'melon' ? 15 : ty === 'frag' ? 8 : ty === 'acorn' ? 22 : ty === 'skunk' ? 14 : ty === 'bowling' ? 17 : ty === 'vortex' ? 13 : 12); }
-    if (e.fuse && ty !== 'melon' && ty !== 'bowling' && ty !== 'vortex') { x.rotate(-e.spin); x.fillStyle = '#fff'; x.font = 'bold 10px sans-serif'; x.textAlign = 'center'; x.fillText(Math.ceil(e.fuseT), 0, -12); }
+    else if (ty === 'arrow' || ty === 'parrow') { x.rotate(e.stuck ? e.spin : Math.atan2(e.vy, e.vx)); drawIcon(x, ty, 13); }
+    else if (ty === 'fireball' || ty === 'magic' || ty === 'comet') { x.rotate(Math.atan2(e.vy, e.vx)); if (ty === 'comet') x.rotate(Math.PI); drawIcon(x, ty, ty === 'comet' ? 26 : ty === 'magic' ? 11 : 15); }
+    else if (ty === 'molebomb') { x.rotate(e.dig ? Math.atan2(e.dig.dy, e.dig.dx) : e.spin); drawIcon(x, 'molebomb', 14); }
+    else { x.rotate(e.spin); drawIcon(x, ty === 'frag' ? 'frag' : ty, PROJ_SIZE[ty] || 12); }
+    if (e.fuse && !NO_FUSE_TEXT.has(ty)) { x.rotate(-e.spin); x.fillStyle = '#fff'; x.font = 'bold 10px sans-serif'; x.textAlign = 'center'; x.fillText(Math.ceil(e.fuseT), 0, -12); }
+    if (e.remote && (t * 4 | 0) % 2) { x.rotate(-e.spin); x.fillStyle = '#ff2'; circ(x, 0, -e.r - 3, 2); x.fill(); }
   } else if (e instanceof Mine) {
     x.fillStyle = e.spent ? '#666' : '#3b3b45'; x.strokeStyle = '#111'; x.lineWidth = 1;
     x.beginPath(); x.ellipse(0, 1, 6, 4, 0, 0, 7); x.fill(); x.stroke();
@@ -280,6 +302,12 @@ function drawEntity(x, e, t) {
     if (e.type === 'health') { rr(x, -9, -9, 18, 18, 2); x.fillStyle = '#fafafa'; x.fill(); x.stroke(); x.fillStyle = '#e63946'; x.fillRect(-2.5, -6, 5, 12); x.fillRect(-6, -2.5, 12, 5); }
     else { rr(x, -9, -9, 18, 18, 2); x.fillStyle = e.type === 'trap' ? '#b88452' : '#b5814f'; x.fill(); x.stroke();
       x.beginPath(); x.moveTo(-9, -9); x.lineTo(9, 9); x.moveTo(9, -9); x.lineTo(-9, 9); x.stroke(); x.fillStyle = '#ffd23f'; x.font = 'bold 11px sans-serif'; x.textAlign = 'center'; x.fillText('?', 0, 4); }
+    // Crate Spy: the owning team sees what is inside
+    const spyTeam = g.active ? g.active.team : null;
+    if (spyTeam && spyTeam.crateSpy && (!g.online || spyTeam.idx === Net.myTeam || Net.role === 'host' && spyTeam.idx === 0)) {
+      const lab = e.type === 'trap' ? 'TRAP!' : e.type === 'health' ? '+25 HP' : (WEAP[e.content] ? WEAP[e.content].name : '?');
+      x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = 'rgba(43,29,18,0.9)'; x.strokeText(lab, 0, e.chute ? 22 : -14); x.fillStyle = e.type === 'trap' ? '#ff6b6b' : '#ffe066'; x.fillText(lab, 0, e.chute ? 22 : -14);
+    }
   } else if (e instanceof Grave) {
     x.fillStyle = '#9aa3ad'; x.strokeStyle = '#2b1d12'; x.lineWidth = 1.2;
     x.beginPath(); x.moveTo(-6, 7); x.lineTo(-6, -3); x.arc(0, -3, 6, Math.PI, 0); x.lineTo(6, 7); x.closePath(); x.fill(); x.stroke();
@@ -319,10 +347,25 @@ function drawEntity(x, e, t) {
   } else if (e instanceof Volcano) {
     drawIcon(x, 'volcano', 22);
   } else if (e instanceof Robot) {
-    x.scale(e.dir, 1); x.translate(0, -2 + Math.abs(Math.sin(e.legPh)) * -1); drawIcon(x, 'robot', 15);
-    x.rotate(e.t * 8); x.strokeStyle = '#2b1d12'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(-6, -3); x.lineTo(-6, 3); x.stroke();
+    const kind = e.kind || 'robot';
+    x.scale(e.dir, 1); x.translate(0, -2 + Math.abs(Math.sin(e.legPh)) * -1); x.rotate(Math.sin(e.legPh) * (kind === 'robot' ? 0 : 0.08));
+    drawIcon(x, ANIMAL_ICON[kind] || 'robot', kind === 'boar' ? 24 : kind === 'cow' || kind === 'rhino' ? 19 : kind === 'ferret' ? 14 : 15);
+    if (kind === 'robot') { x.rotate(e.t * 8); x.strokeStyle = '#2b1d12'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(-6, -3); x.lineTo(-6, 3); x.stroke(); }
+  } else if (e instanceof Flyer) {
+    x.rotate(e.ang); if (Math.cos(e.ang) < 0) x.scale(1, -1); drawIcon(x, 'squirrel', 20);
+  } else if (e instanceof Sentry) {
+    const col = g.teams[e.ti] ? g.teams[e.ti].color : '#9aa3ad';
+    x.strokeStyle = '#2b1d12'; x.lineWidth = 1.5; rr(x, -9, 2, 18, 6, 2); x.fillStyle = '#5c6670'; x.fill(); x.stroke();
+    circ(x, 0, -4, 7); x.fillStyle = col; x.fill(); x.stroke();
+    x.save(); x.translate(0, -6); x.rotate(e.ang); rr(x, 0, -2.5, 14, 5, 1.5); x.fillStyle = '#3a3a44'; x.fill(); x.stroke(); x.restore();
+    x.fillStyle = e.shots > 0 ? ((t * 2 | 0) % 2 ? '#ff2a2a' : '#661010') : '#333'; circ(x, -2, -6, 1.8); x.fill();
+  } else if (e instanceof Pump) {
+    drawIcon(x, 'gaspump', 18); if (e.t < 7) { x.translate(0, -8 + Math.sin(t * 14) * 1.5); x.fillStyle = '#5c6670'; x.fillRect(-5, -2, 10, 3); }
+  } else if (e instanceof Ion) {
+    x.restore(); x.save();
+    if (!e.fired) { const k = Math.min(1, e.t); x.setLineDash([6, 8]); x.strokeStyle = `rgba(255,255,255,${0.3 + 0.6 * k})`; x.lineWidth = 1 + k * 3; x.beginPath(); x.moveTo(e.x, -400); x.lineTo(e.x, g.waterY); x.stroke(); x.setLineDash([]); }
   } else if (e instanceof Anvil) {
-    drawIcon(x, 'anvil', 30);
+    if (e.kind === 'buster') drawIcon(x, 'buster', 22); else drawIcon(x, 'anvil', 30);
   } else if (e instanceof Pelican) {
     x.scale(e.dir, 1); x.rotate(Math.sin(e.flap) * 0.05);
     x.fillStyle = '#fff'; x.strokeStyle = '#2b1d12'; x.lineWidth = 1.5;
@@ -369,7 +412,7 @@ function drawParticles(x) {
 }
 
 function drawAimUI(x, c) {
-  if (!g.controlling || g.retreat || c.mode === 'jet') return;
+  if (!g.controlling || g.retreat || c.mode === 'jet' || c.mode === 'kami' || c.mode === 'chute') return;
   const d = aimVec(c), W = WEAP[g.weapon];
   if (c.mode === 'rope') return;
   if (W.kind !== 'click') {
@@ -379,7 +422,7 @@ function drawAimUI(x, c) {
     // held item
     x.save(); x.translate(c.x + d.x * 12, c.y + d.y * 12 + 2); x.rotate(Math.atan2(d.y, d.x)); if (c.facing < 0) x.scale(1, -1); drawIcon(x, g.weapon, 13); x.restore();
   }
-  if (g.weapon === 'rifle' && myTurn() && !g.ai) { // laser sight
+  if ((g.weapon === 'rifle' || g.laser) && W.kind !== 'click' && myTurn() && !g.ai) { // laser sight (the rifle has one built in)
     let lx = c.x + d.x * 14, ly = c.y + d.y * 14, n = 0;
     while (n++ < 220 && !Terrain.solid(lx, ly) && lx > 0 && lx < CFG.W && ly < g.waterY) { lx += d.x * 6; ly += d.y * 6; }
     x.save(); x.setLineDash([4, 6]); x.strokeStyle = 'rgba(255,60,60,0.55)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(c.x + d.x * 14, c.y + d.y * 14); x.lineTo(lx, ly); x.stroke(); x.restore();
@@ -403,12 +446,13 @@ function drawTargets(x) {
   }
   if (!g.controlling || g.retreat || g.ai || UI.blocking() || !myTurn()) return;
   const m = screenToWorld(Input.mx, Input.my), id = g.weapon;
-  if (id === 'swap') {
-    let best = null, bd = 40; for (const o of g.critters) if (o.alive && o !== c) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < bd) { bd = dd; best = o; } }
-    if (best) { x.strokeStyle = '#ffd23f'; x.lineWidth = 2; x.setLineDash([4, 4]); circ(x, best.x, best.y, best.r + 6); x.stroke(); x.beginPath(); x.moveTo(c.x, c.y); x.lineTo(best.x, best.y); x.stroke(); x.setLineDash([]); }
+  if (id === 'swap' || id === 'abduct' || id === 'balloon' || id === 'selectcritter') {
+    let best = null, bd = 40;
+    for (const o of g.critters) if (o.alive && (id === 'balloon' || id === 'abduct' || o !== c) && (id !== 'selectcritter' || o.team === c.team)) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < bd) { bd = dd; best = o; } }
+    if (best) { x.strokeStyle = id === 'abduct' ? '#8ef' : '#ffd23f'; x.lineWidth = 2; x.setLineDash([4, 4]); circ(x, best.x, best.y, best.r + 6); x.stroke(); if (id === 'swap') { x.beginPath(); x.moveTo(c.x, c.y); x.lineTo(best.x, best.y); x.stroke(); } x.setLineDash([]); }
   } else if (id === 'shower') {
     x.setLineDash([8, 8]); x.strokeStyle = 'rgba(255,210,63,0.6)'; x.lineWidth = 2; x.strokeRect(m.x - 230, m.y - 400, 460, 800); x.setLineDash([]);
-  } else if (id === 'pelican' || id === 'anvil' || id === 'thunder') {
+  } else if (WEAP[id].air) {
     x.setLineDash([8, 8]); x.strokeStyle = 'rgba(255,255,255,0.7)'; x.lineWidth = 2; x.beginPath(); x.moveTo(m.x, m.y - 400); x.lineTo(m.x, m.y + 400); x.stroke(); x.setLineDash([]);
   } else if (id === 'teleport') {
     x.globalAlpha = 0.5; x.strokeStyle = validTeleport(m.x, m.y) ? '#c77dff' : '#f00'; x.lineWidth = 2; circ(x, m.x, m.y, CFG.CR); x.stroke(); x.globalAlpha = 1;

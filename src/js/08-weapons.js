@@ -12,6 +12,8 @@ function handleFire(c, inp, dt) {
   if (g.retreat) return;
   if (c.mode === 'rope') { if (inp.firePress) c.release(); return; }
   if (c.mode === 'jet') { if (inp.firePress) c.release(); return; }
+  if (c.mode === 'chute') { if (inp.firePress) { c.release(); addText(c.x, c.y - 24, 'chute closed', '#fff', 12, 0.8); } return; }
+  if (c.mode === 'kami') return;
   if (g.ents.some(e => e instanceof Rope && e.state === 'shoot')) return;
   if (g.shotCD > 0) return;
   const W = WEAP[g.weapon], team = c.team;
@@ -39,8 +41,13 @@ function handleFire(c, inp, dt) {
 }
 
 function fireCharged(c) {
-  const d = aimVec(c), sp = Math.max(0.06, g.power) * CFG.MAX_POWER, id = g.weapon;
+  const d = aimVec(c), id = g.weapon; let sp = Math.max(0.06, g.power) * CFG.MAX_POWER;
   const sx = c.x + d.x * (c.r + 5), sy = c.y + d.y * (c.r + 5);
+  if (id === 'launcher') sp *= 1.3;
+  if (id === 'superbanana') {   // remote detonation: the turn runs on until you press fire again (or the turn clock runs out)
+    const p = spawn(new Proj('superbanana', sx, sy, d.x * sp, d.y * sp, { owner: c })); p.hint = 'Space: KABOOM!';
+    g.robot = p; g.focus = p; g.fired = true; g.lockWeapon = true; g.charging = false; useAmmo(id); Sfx.whoosh(); c.speak(pick(['Nana time!', 'Catch!'])); return;
+  }
   if (id === 'mortar') { spawn(new Burst(c, d.x * sp, d.y * sp)); useAmmo(id); afterFire(); return; }
   if (id === 'cannon') {   // fire yourself: a tool, so the turn carries on after landing
     c.release(); c.mode = 'air'; c.vx = d.x * sp * 0.95; c.vy = d.y * sp * 0.95 - 40; c.fallDmg = false; c.tumble = false; c.flipV = -c.facing * 9; c.y -= 2; c.squash = -0.3;
@@ -52,8 +59,10 @@ function fireCharged(c) {
     for (let i = -1; i <= 1; i++) { const a = Math.atan2(d.y, d.x) + i * 0.14, k = 1 + i * 0.06; const p = spawn(new Proj('seed', sx, sy, Math.cos(a) * sp * k, Math.sin(a) * sp * k, { owner: c })); if (!i) g.focus = p; }
     useAmmo(id); afterFire(); Sfx.shot(); c.speak('Ptoo ptoo ptoo!'); return;
   }
-  const p = spawn(new Proj(id, sx, sy, d.x * sp, d.y * sp, { owner: c, fuse: id === 'bomb' ? g.fuse : undefined, target: g.target }));
+  const p = spawn(new Proj(id === 'launcher' ? 'glaunch' : id, sx, sy, d.x * sp, d.y * sp, { owner: c, fuse: id === 'bomb' ? g.fuse : undefined, target: g.target }));
   g.focus = p; useAmmo(id); afterFire();
+  if (id === 'holy') c.speak(pick(['One… two… FIVE!', 'Hallelujah!']));
+  if (id === 'fridge') c.speak(pick(['Heavy!', 'Mind the fridge!']));
   if (id === 'rocket') Sfx.rocket(); else Sfx.whoosh();
   if (id === 'boomerang') c.speak(pick(['Come back now!', 'Twirly!']));
   if (Math.random() < 0.3) c.speak(pick(QUIPS.fire));
@@ -106,9 +115,199 @@ function fireInstant(c, id) {
       if (c.mode === 'ground' || c.mode === 'air') spawn(new Rope(c, d.x, d.y)); break;
     case 'jetpack':
       c.mode = 'jet'; c.fuel = 4; c.fallDmg = false; c.tumble = false; c.vy = Math.min(c.vy, -80); useAmmo(id); break;
+    // ---- the big arsenal ----
+    case 'bow': case 'poisonarrow': {
+      if (id === 'bow') { if (g.shotsLeft === 0) { useAmmo(id); g.shotsLeft = 2; g.lockWeapon = true; } g.shotsLeft--; } else useAmmo(id);
+      const p = spawn(new Proj(id === 'bow' ? 'arrow' : 'parrow', c.x + d.x * (c.r + 4), c.y + d.y * (c.r + 4), d.x * 720, d.y * 720, { owner: c }));
+      g.focus = p; g.shotCD = 0.5; Sfx.swoosh(); P({ kind: 'flash', x: p.x, y: p.y, r: 5, life: 0.06 });
+      if (id !== 'bow' || g.shotsLeft === 0) afterFire(); break;
+    }
+    case 'handgun': startVolley(c, id, 5, 7, 0.02, 0.22, 90); break;
+    case 'uzi': startVolley(c, id, 12, 4, 0.09, 0.08, 60); break;
+    case 'minigun': startVolley(c, id, 25, 5, 0.1, 0.08, 40); c.speak(pick(['Say hello!', 'BRRRRT!'])); break;
+    case 'railgun': railgun(c); useAmmo(id); afterFire(); break;
+    case 'magic': {
+      let near = null, nd = 1e9;
+      for (const o of g.critters) if (o.alive && o.team !== c.team) { const dd = Math.hypot(o.x - c.x, o.y - c.y); if (dd < nd) { nd = dd; near = o; } }
+      if (!near) { banner('Nobody to seek!'); return; }
+      g.focus = spawn(new Proj('magic', c.x + d.x * 14, c.y + d.y * 14, d.x * 300, d.y * 300, { owner: c, target: near }));
+      useAmmo(id); afterFire(); Sfx.teleport(); c.speak(pick(['Seek and destroy!', 'Go find them!'])); break;
+    }
+    case 'virus': virusRay(c); useAmmo(id); afterFire(); break;
+    case 'dragon':
+      g.focus = spawn(new Proj('fireball', c.x + d.x * (c.r + 6), c.y + d.y * (c.r + 6), d.x * 330, d.y * 330, { owner: c }));
+      Sfx.flame(); useAmmo(id); afterFire(); c.speak(pick(['HA-DO-QUILL!', 'Fireball!'])); break;
+    case 'waterpistol': cone(c, { range: 95, half: 0.5, dmg: 0, kx: 320, ky: 160, douse: true, water: true }); useAmmo(id); afterFire(); c.speak('Splish!'); break;
+    case 'dubstep': cone(c, { range: 135, half: 1.0, dmg: 12, kx: 440, ky: 300, notes: true }); useAmmo(id); afterFire(); c.speak(pick(['WUB WUB WUB', 'Drop the bass!'])); break;
+    case 'axe': case 'punch': case 'prod': case 'chainsaw': melee(c, id); useAmmo(id); afterFire(); break;
+    case 'kamikaze':
+      if (c.mode !== 'ground' && c.mode !== 'air') return;
+      g.focus = spawn(new Kami(c, d.x, d.y)); useAmmo(id); afterFire(); c.speak(pick(['BANZAIII!', 'Remember meee!'])); break;
+    case 'suicide':
+      explode(c.x, c.y, 60, 50, { ignore: c });
+      for (let i = 0; i < 10; i++) { const a = rand(0, 6.28), sp = rand(20, 90); spawn(new GasPuff(c.x + Math.cos(a) * 6, c.y - 6 + Math.sin(a) * 6, Math.cos(a) * sp, Math.sin(a) * sp - 30)); }
+      hurt(c, 999); c.vx = c.vy = 0; useAmmo(id); afterFire(); c.speak(pick(['It was an honour.', 'Boom goes the hedgehog!'])); break;
+    case 'nuke':
+      g.waterTarget = Math.max(400, g.waterTarget - 45);
+      for (const o of g.critters) if (o.alive) poisonCritter(o, 3);
+      P({ kind: 'flash', x: c.x, y: c.y, r: 900, life: 0.5 }); shake(22); Sfx.thunder(); Sfx.rumble();
+      banner('ATOMIC! Everyone is poisoned and the water is rising!', '#8ac926'); useAmmo(id); afterFire(); c.speak('Oops.'); break;
+    case 'squirrel': {
+      if (c.mode !== 'ground') return;
+      const f = spawn(new Flyer(c, Math.atan2(d.y, d.x))); g.robot = f; g.focus = f; g.fired = true; g.lockWeapon = true; useAmmo(id); c.speak(pick(['Fly, my pretty!', 'Up and away!'])); break;
+    }
+    case 'cows': case 'ferrets':
+      if (c.mode !== 'ground') return;
+      spawn(new Herd(c, id === 'cows' ? 'cow' : 'ferret', 3)); useAmmo(id); afterFire(); c.speak(id === 'cows' ? 'Mooooove!' : 'Go get \'em!'); break;
+    case 'granny': case 'rhino': case 'boar': {
+      if (c.mode !== 'ground') return;
+      const r = spawn(new Robot(c.x + c.facing * 14, c.y - 2, c.facing, id)); r.owner = c; g.focus = r; useAmmo(id); afterFire();
+      c.speak(id === 'granny' ? 'Off you pop, Auntie!' : id === 'rhino' ? 'Charge!' : 'Sooey!'); Sfx.tone(id === 'granny' ? 400 : 160, 0.25, 'sawtooth', 0.08, id === 'granny' ? 600 : 90); break;
+    }
+    case 'megamine': {
+      if (c.mode !== 'ground') return;
+      const m = spawn(new Mine(c.x + c.facing * 12, c.y + c.r - 8, false, true)); m.vx = c.facing * 10; useAmmo(id); afterFire(); c.speak('Three seconds. RUN!'); Sfx.tick(); break;
+    }
+    case 'c4': {
+      const p = spawn(new Proj('c4', c.x + c.facing * 6, c.y, c.facing * 20, -40, { owner: c })); p.hint = 'Space: KABOOM!';
+      g.robot = p; g.focus = c; g.fired = true; g.lockWeapon = true; useAmmo(id); Sfx.tick(); c.speak('Fizz fizz…'); break;
+    }
+    case 'teapot':
+      if (c.mode !== 'ground') return;
+      g.focus = spawn(new Proj('teapot', c.x + c.facing * 8, c.y - 2, c.facing * 20, -50, { owner: c, fuse: 3 })); useAmmo(id); afterFire(); c.speak('Priceless!'); Sfx.clack(); break;
+    case 'sentry':
+      if (c.mode !== 'ground') return;
+      spawn(new Sentry(c.x + c.facing * 16, c.y, c.team)); useAmmo(id); afterFire(); Sfx.clank(); c.speak('Guard this spot.'); break;
+    case 'gaspump':
+      if (c.mode !== 'ground') return;
+      spawn(new Pump(c.x + c.facing * 14, c.y)); useAmmo(id); afterFire(); Sfx.hiss(); c.speak('Pee-yew, already.'); break;
+    // ---- utilities ----
+    case 'parachute':
+      if (c.mode === 'chute') { c.release(); return; }
+      if (c.mode !== 'air') { banner('Jump first, then open the chute!'); return; }
+      c.release(); c.mode = 'chute'; c.fallDmg = false; c.tumble = false; c.spin = 0; c.spinV = 0; c.vy = Math.min(c.vy, 40); c.jetX = 0; useAmmo(id); Sfx.whoosh(); break;
+    case 'lowgrav': g.gravMul = 0.45; useAmmo(id); banner('Low gravity!', '#c77dff'); Sfx.teleport(); c.speak('Moon boots on!'); break;
+    case 'fastwalk': g.walkMul = 2.3; useAmmo(id); banner('Roller skates on!', '#ffd23f'); Sfx.boing(); c.speak('Wheee!'); break;
+    case 'laser': g.laser = true; useAmmo(id); banner('Laser sight on', '#ff4d6d'); Sfx.tick(); break;
+    case 'dbldmg': g.dmgMul = 2; useAmmo(id); banner('DOUBLE DAMAGE!', '#ff4d6d'); shake(6); Sfx.stomp(); c.speak('Feeling strong!'); break;
+    case 'dbltime': g.turnT += g.settings.turnTime; useAmmo(id); banner('Extra time!', '#8ecae6'); Sfx.pickup(); break;
+    case 'cratespy': c.team.crateSpy = true; useAmmo(id); banner('Crate contents revealed', '#ffd23f'); Sfx.tick(); c.speak('I see you.'); break;
+    case 'crateshower': useAmmo(id); dropCrates(4); Sfx.pickup(); c.speak('Presents!'); break;
+    case 'hibernate':
+      if (c.mode !== 'ground') return;
+      c.frozen = 1; c.land(0); useAmmo(id); g.fired = true; addText(c.x, c.y - 30, 'HIBERNATING', '#9ad7ff', 18); Sfx.tone(900, 0.3, 'sine', 0.1, 300);
+      for (let i = 0; i < 14; i++) P({ kind: 'spark', x: c.x, y: c.y, vx: rand(-100, 100), vy: rand(-100, 100), g: 0, drag: 0.9, size: 2, life: 0.6, col: '#fff' });
+      c.speak(pick(['Zzz… brrr.', 'Wake me when it\'s over.'])); endControl(); break;
     case 'skip':
       c.sadT = 3; c.speak(pick(['Nap time.', 'Pass!', 'Zzz…'])); g.fired = true; endControl(); break;
   }
+}
+
+// ---- helpers for the big arsenal ----
+function startVolley(c, id, n, dmg, spread, rate, kick) { const v = spawn(new Volley(c, n, dmg, spread, rate, kick)); g.robot = v; g.fired = true; g.lockWeapon = true; useAmmo(id); }
+// One gun round: a hitscan along the aim (plus a little spread) that nicks the terrain and shoves the victim
+function fireRound(c, dmg, kick, spread) {
+  const d0 = aimVec(c), a = Math.atan2(d0.y, d0.x) + rand(-spread, spread), d = { x: Math.cos(a), y: Math.sin(a) };
+  let x = c.x + d.x * (c.r + 2), y = c.y + d.y * (c.r + 2); const x0 = x, y0 = y;
+  Sfx.pew(); shake(1.5); P({ kind: 'flash', x: x0 + d.x * 6, y: y0 + d.y * 6, r: 5, life: 0.06 });
+  outer: for (let i = 0; i < 700; i++) {
+    x += d.x * 2; y += d.y * 2;
+    for (const o of g.critters) if (o.alive && o !== c && (o.x - x) ** 2 + (o.y - y) ** 2 < (o.r + 1) ** 2) {
+      hurt(o, dmg); o.vx += d.x * kick; o.vy += d.y * kick - kick * 0.5; o.knocked();
+      for (let k = 0; k < 4; k++) P({ kind: 'spark', x, y, vx: rand(-120, 120), vy: rand(-120, 40), g: 300, drag: 0.95, size: 1.8, life: 0.25 });
+      break outer;
+    }
+    for (const e of g.ents) if (e.onBlast && !(e instanceof Critter) && !e.dead && e.r && (e.x - x) ** 2 + (e.y - y) ** 2 < e.r * e.r) { e.onBlast(0.4, d.x, d.y, dmg + 4); break outer; }
+    if (Terrain.solid(x, y)) { Terrain.carve(x, y, 4, false); dustFx(x, y, 1); break; }
+    if (x < 0 || x > CFG.W || y > g.waterY || y < -400) break;
+  }
+  addTracer(x0, y0, x, y);
+}
+// Rail Thorn: a hitscan that ignores terrain completely and hits every critter on the line
+function railgun(c) {
+  const d = aimVec(c); let x = c.x + d.x * (c.r + 2), y = c.y + d.y * (c.r + 2); const x0 = x, y0 = y, hit = new Set();
+  Sfx.crack(); Sfx.laser(); shake(8); P({ kind: 'flash', x: x0, y: y0, r: 12, life: 0.1 });
+  for (let i = 0; i < 600; i++) {
+    x += d.x * 3; y += d.y * 3;
+    for (const o of g.critters) if (o.alive && o !== c && !hit.has(o) && (o.x - x) ** 2 + (o.y - y) ** 2 < (o.r + 3) ** 2) {
+      hit.add(o); hurt(o, 45); o.vx += d.x * 260; o.vy += d.y * 260 - 120; o.knocked();
+      for (let k = 0; k < 10; k++) P({ kind: 'spark', x, y, vx: rand(-180, 180), vy: rand(-180, 60), g: 300, drag: 0.95, size: 2, life: 0.35, col: '#9ad7ff' });
+    }
+    for (const e of g.ents) if (e.onBlast && !(e instanceof Critter) && !e.dead && e.r && !hit.has(e) && (e.x - x) ** 2 + (e.y - y) ** 2 < e.r * e.r) { hit.add(e); e.onBlast(1, d.x, d.y, 50); }
+    if (x < -50 || x > CFG.W + 50 || y > g.waterY || y < -500) break;
+  }
+  P({ kind: 'beam', x: x0, y: y0, x2: x, y2: y, life: 0.45, col: '#9ad7ff' }); addTracer(x0, y0, x, y);
+  if (hit.size > 1) addText(c.x, c.y - 30, `${hit.size} skewered!`, '#9ad7ff', 18);
+}
+// Sneeze Virus: infect the first critter on the aim line; the infection spreads at turn starts (see startTurn)
+function virusRay(c) {
+  const h = castRay(c, 700); Sfx.hiss(); shake(2);
+  for (let k = 0; k < 16; k++) { const t = rand(0, 1); P({ kind: 'smoke', x: lerp(h.x0, h.x, t), y: lerp(h.y0, h.y, t), vx: rand(-20, 20), vy: rand(-30, 0), g: 0, drag: 0.95, size: rand(3, 6), life: 0.6, col: '#8ac926' }); }
+  c.face = 4; c.faceT = 0.6; c.speak(pick(['Ah… ah… ACHOO!', 'Sorry!']));
+  if (!h.o) { addText(h.x, h.y - 10, 'achoo…', '#8ac926', 14, 1); return; }
+  const o = h.o; poisonCritter(o, 4); o.virus = true; addText(o.x, o.y - 42, 'INFECTED!', '#8ac926', 18); o.speak(pick(['*sniff*', 'I feel funny.']));
+}
+// Cone attacks (squirt gun, wub horn): shove everything in a wedge in front of the critter
+function cone(c, o) {
+  const d = aimVec(c), ang = Math.atan2(d.y, d.x);
+  if (o.notes) { Sfx.kazoo(); Sfx.stomp(); shake(6); for (let i = 0; i < 24; i++) { const a = ang + rand(-1, 1), sp = rand(100, 300); P({ kind: 'note', x: c.x + d.x * 12, y: c.y + d.y * 12, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -20, drag: 0.93, size: rand(12, 20), life: 0.9, col: pick(['#c77dff', '#ff4d6d', '#fff']) }); } }
+  else { Sfx.splash(); for (let i = 0; i < 30; i++) { const a = ang + rand(-0.5, 0.5), sp = rand(150, 320); P({ kind: 'water', x: c.x + d.x * 12, y: c.y + d.y * 12, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 500, size: rand(2, 3.5), life: 0.6 }); } }
+  for (const e of g.ents.slice()) {
+    if (e === c || e.dead || (e instanceof Critter && !e.alive)) continue;
+    const dx = e.x - c.x, dy = e.y - c.y, dd = Math.hypot(dx, dy); if (dd > o.range || dd < 1) continue;
+    let da = Math.atan2(dy, dx) - ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > o.half) continue;
+    const f = 1 - dd / (o.range * 1.25);
+    if (e instanceof Lava || e instanceof GasPuff) { if (o.douse) e.dead = true; continue; }
+    if (e instanceof Critter) { if (o.dmg) hurt(e, o.dmg); e.vx += d.x * o.kx * f; e.vy += d.y * o.ky * f - 200 * f; e.knocked(); if (o.douse && e.face === 3) { e.face = 0; e.faceT = 0; } }
+    else if (e instanceof Barrel && o.douse && e.fuseT >= 0) { e.fuseT = -1; e.hp = 15; }
+    else if (e.onBlast) e.onBlast(f, d.x, d.y, 4);
+  }
+}
+// Melee swings: axe halves HP, uppercut launches, poke nudges, trimmer cuts terrain too
+function melee(c, kind) {
+  const d = aimVec(c); let hit = false;
+  Sfx[kind === 'chainsaw' ? 'drill' : kind === 'punch' ? 'flame' : 'slap']();
+  P({ kind: 'icon', icon: kind, x: c.x + d.x * 14, y: c.y + d.y * 14 - 4, vx: d.x * 60 + c.facing * 30, vy: -60, g: 400, drag: 0.96, size: 22, rot: c.facing < 0 ? Math.PI : 0, vr: 10 * c.facing, life: 0.45 });
+  for (const e of g.ents.slice()) {
+    if (e === c || e.dead || (e instanceof Critter && !e.alive)) continue;
+    const dx = e.x - c.x, dy = e.y - c.y, dd = Math.hypot(dx, dy); if (dd > (kind === 'chainsaw' ? 46 : 36) || dx * d.x + dy * d.y < dd * 0.25) continue;
+    if (e instanceof Critter) {
+      hit = true;
+      if (kind === 'axe') { const h = Math.max(1, Math.ceil((e.hp - e.pending) / 2)); hurt(e, h); e.vx += c.facing * 120; e.vy -= 90; e.knocked(); addText(e.x, e.y - 44, 'CHOP!', '#fff', 16); }
+      else if (kind === 'punch') { hurt(e, 30); e.vx += c.facing * 90; e.vy = -440; e.knocked(); e.face = 3; e.faceT = 0.8; for (let k = 0; k < 10; k++) P({ kind: 'fire', x: e.x, y: e.y, vx: rand(-60, 60), vy: rand(-200, -40), g: -50, drag: 0.93, size: rand(3, 6), life: 0.4 }); }
+      else if (kind === 'prod') { e.release(); e.vx = c.facing * 85; e.vy = -115; e.fallDmg = false; e.tumble = false; e.y -= 1; e.squash = -0.2; e.speak(pick(['Hey!', 'Oi!', 'Rude.'])); }
+      else if (kind === 'chainsaw') { hurt(e, 25); e.vx += c.facing * 260; e.vy -= 150; e.knocked(); }
+    } else if (e.onBlast) e.onBlast(1, d.x, d.y, kind === 'prod' ? 2 : 20);
+  }
+  if (kind === 'chainsaw') {
+    for (let i = 1; i <= 4; i++) Terrain.carve(c.x + d.x * (10 + i * 9), c.y + d.y * (10 + i * 9), 9, false);
+    for (let k = 0; k < 12; k++) P({ kind: 'dirt', x: c.x + d.x * 24, y: c.y + d.y * 24, vx: rand(-120, 120) + d.x * 60, vy: rand(-180, -40), g: 650, drag: 1, size: rand(1.5, 3.5), col: pick(Terrain.theme.dirt), life: 0.8 });
+    shake(4);
+  } else if (!hit) addText(c.x, c.y - 30, 'whiff!', '#fff', 14, 1);
+}
+// Pick a Critter: hand this turn to another critter of the same team
+function switchActive(o) {
+  const c = g.active; g.active = o; o.team.cIdx = o.team.critters.indexOf(o); g.turnStartT = g.time; g.charging = false;
+  if (c) { c.walking = false; c.jumpT = 0; }
+  banner(`${o.name} steps up!`, o.team.color); o.speak(pick(QUIPS.turn)); Sfx.pickup();
+  for (let i = 0; i < 14; i++) P({ kind: 'spark', x: o.x, y: o.y, vx: rand(-100, 100), vy: rand(-140, -20), g: 300, drag: 0.95, size: 2, life: 0.6, col: o.team.color });
+}
+// A random open spot on the surface (alien abductions, crate showers)
+function randomSpot() {
+  for (let i = 0; i < 80; i++) {
+    const x = rand(80, CFG.W - 80); let y = Terrain.cavern ? 14 : -20;
+    if (Terrain.cavern) { while (y < g.waterY && Terrain.solid(x, y)) y += 2; y += 14; }
+    while (y < g.waterY - 40 && !Terrain.solid(x, y)) y += 4;
+    if (y >= g.waterY - 40) continue;
+    const sy = y - CFG.CR - 2; if (validTeleport(x, sy)) return { x, y: sy };
+  }
+  return null;
+}
+function dropCrates(n) {
+  let k = 0;
+  for (let i = 0; i < n * 3 && k < n; i++) { const sp = randomSpot(); if (!sp) continue; spawn(makeCrate(sp.x, Math.max(Terrain.cavern ? sp.y - 120 : -20, sp.y - 380))); k++; }
+  if (k) banner(k > 1 ? `${k} crates incoming!` : 'Crate incoming!', '#ffd23f');
+  return k;
 }
 
 function shootScatter(c) {
@@ -296,6 +495,33 @@ function doClickAction(c, id, wx, wy) {
       if (!best) { banner('Click on a critter to tie the balloon to!'); return; }
       if (best.frozen > 0) { banner("That one's frozen to the ground!"); return; }
       g.focus = spawn(new Balloon(best)); best.speak(best === c ? pick(['Up, up and away!', 'Bye!']) : pick(['Wha–?!', 'Put me down!', 'Not again!'])); Sfx.whoosh(); useAmmo(id); afterFire(); break;
+    }
+    case 'napalm': case 'minestrike': case 'cratestrike': case 'poisonstrike': case 'waterstrike': case 'frogstrike': case 'homingstrike': case 'molestrike': case 'carpet':
+      g.focus = spawn(new Pelican(wx, id, { x: wx, y: wy }, c)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire();
+      c.speak(pick(['Incoming!', 'Look up!', 'Special delivery!'])); break;
+    case 'comet':
+      g.focus = spawn(new Proj('comet', wx + rand(-15, 15), -60, rand(-30, 30), 360, { owner: c })); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); Sfx.rumble(); c.speak('Here it comes!'); break;
+    case 'ion':
+      g.focus = spawn(new Ion(wx)); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak(pick(['Charging…', 'From orbit!'])); break;
+    case 'buster':
+      g.focus = spawn(new Anvil(wx, 'buster')); g.target = { x: wx, y: wy }; useAmmo(id); afterFire(); c.speak('Knock knock.'); break;
+    case 'abduct': {
+      let best = null, bd = 40;
+      for (const o of g.critters) if (o.alive) { const dd = Math.hypot(o.x - wx, o.y - wy); if (dd < bd) { bd = dd; best = o; } }
+      if (!best) { banner('Click on a critter to abduct!'); return; }
+      if (best.frozen > 0) { banner("That one's frozen to the ground!"); return; }
+      const sp = randomSpot(); if (!sp) { banner('The aliens found nowhere to put them!'); return; }
+      P({ kind: 'beam', x: best.x, y: -400, x2: best.x, y2: best.y, life: 0.6, col: '#8ef' });
+      for (let i = 0; i < 20; i++) P({ kind: 'spark', x: best.x, y: best.y, vx: rand(-80, 80), vy: rand(-300, -100), g: 0, drag: 0.97, size: 2, life: 0.7, col: '#8ef' });
+      best.x = sp.x; best.y = sp.y; best.release(); best.fallDmg = false; best.vx = best.vy = 0; best.mode = 'air'; best.face = 2; best.faceT = 1.5;
+      P({ kind: 'beam', x: sp.x, y: -400, x2: sp.x, y2: sp.y, life: 0.6, col: '#8ef' });
+      best.speak(pick(['Take me to your leader!', 'Where am I?!', 'They probed me.'])); Sfx.teleport(); useAmmo(id); afterFire(); break;
+    }
+    case 'selectcritter': {
+      let best = null, bd = 40;
+      for (const o of g.critters) if (o.alive && o !== c && o.team === c.team && o.frozen <= 0) { const dd = Math.hypot(o.x - wx, o.y - wy); if (dd < bd) { bd = dd; best = o; } }
+      if (!best) { banner('Click one of your own critters!'); return; }
+      switchActive(best); useAmmo(id); break;
     }
     case 'swap': {
       let best = null, bd = 40;
@@ -513,6 +739,7 @@ function drawIcon(x, id, s) {
       x.beginPath(); x.ellipse(0, 0, 10, 13, 0, 0, 7); fs(x, '#fff8e7'); x.fillStyle = '#c9b48a'; circ(x, -3, -3, 2); x.fill(); circ(x, 4, 4, 1.5); x.fill(); break;
     case 'frag':
       circ(x, 0, 0, 12); fs(x, '#ff5d73'); x.fillStyle = '#2b1d12'; circ(x, -3, -2, 1.5); x.fill(); circ(x, 3, 3, 1.5); x.fill(); break;
+    default: drawIconMore(x, id); break;
   }
   x.restore();
 }

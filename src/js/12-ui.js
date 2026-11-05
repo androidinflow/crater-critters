@@ -43,7 +43,7 @@ function drawHUD() {
     txt(c.name, s.x, s.y - 26, 12, shade(c.team.color, 0.25), 'center', 3);
     const hp = Math.max(0, Math.ceil(c.hp)), bw = 30;
     rr(ctx, s.x - bw / 2, s.y - 18, bw, 14, 4); ctx.fillStyle = 'rgba(20,12,6,0.85)'; ctx.fill();
-    ctx.font = 'bold 11px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = c.team.color; ctx.fillText(hp, s.x, s.y - 10.5);
+    ctx.font = 'bold 11px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = c.poison > 0 ? '#8ac926' : c.team.color; ctx.fillText(hp, s.x, s.y - 10.5);
     if (c === g.active && g.state === 'turn' && g.time - g.turnStartT < 3) {
       const by = s.y - 44 + Math.sin(g.time * 8) * 4; ctx.fillStyle = c.team.color; ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(s.x - 8, by - 10); ctx.lineTo(s.x + 8, by - 10); ctx.lineTo(s.x, by); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -76,7 +76,8 @@ function drawHUD() {
     ctx.fillStyle = a === 0 ? '#c1121f' : '#6b4b2a'; ctx.fillText(a === -1 ? 'Ammo: ∞' : `Ammo: ${a}`, 82, 51);
     let hint = W.hint.replace('{fuse}', g.fuse).replace('{bee}', g.target ? 'Target locked! Hold Space.' : 'Click to set a target.');
     if (W.air && Terrain.cavern) hint = 'No air-drops in caverns!';
-    if (g.robot) hint = 'Space: KABOOM!'; else if (g.shotsLeft === 1) hint = 'One more shot!';
+    if (g.robot) hint = g.robot.hint || 'Space: KABOOM!'; else if (g.shotsLeft === 1) hint = 'One more shot!';
+    if (c.mode === 'chute') hint = '←→ drift · Space: close chute'; if (c.mode === 'kami') hint = 'BANZAI!';
     if (c.mode === 'rope') hint = '←→ swing · ↑↓ climb · Space let go'; if (c.mode === 'jet') hint = `↑ thrust · fuel ${Math.max(0, c.fuel).toFixed(1)}s`;
     if (T) hint = hint.replace('Hold Space', 'Hold FIRE').replace('Space again', 'FIRE again').replace('Space:', 'FIRE:').replace('Click', 'Tap').replace('click', 'tap').replace('keys 1–5', 'tap map').replace(' (tap map)', '');
     ctx.font = '12px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#2b1d12'; ctx.fillText(hint, 82, 69);
@@ -212,10 +213,11 @@ const UI = {
       root.querySelectorAll('.peek').forEach(e => e.classList.remove('peek')); if (b && T) b.classList.add('peek');
     };
     const equip = W => { if (!weaponUsable(team, W.id)) return; selectWeapon(W.id); this.togglePicker(); Sfx.tone(700, 0.06, 'square', 0.06); };
-    for (const [title, filt] of [['Weapons', W => !W.util], ['Tools', W => W.util]]) {
-      const grp = document.createElement('div'); grp.className = 'wgroup'; const h = document.createElement('h3'); h.textContent = title;
+    for (const [cat, title] of WCATS) {
+      const list = WEAPONS.filter(W => W.cat === cat); if (!list.length) continue;
+      const grp = document.createElement('div'); grp.className = 'wgroup'; const h = document.createElement('h3'); h.textContent = `${title} · ${list.filter(W => weaponUsable(team, W.id)).length}/${list.length}`;
       const grid = document.createElement('div'); grid.className = 'wgrid'; grp.append(h, grid); root.appendChild(grp);
-      for (const W of WEAPONS.filter(filt)) {
+      for (const W of list) {
         const b = document.createElement('button'); b.className = 'wbtn' + (g.weapon === W.id ? ' sel' : ''); b.title = T ? '' : W.desc;
         const cv = document.createElement('canvas'); cv.width = 96; cv.height = 96; const x = cv.getContext('2d'); x.translate(48, 50); drawIcon(x, W.id, 80);
         const a = team.ammo[W.id] ?? 0, lab = document.createElement('span'); lab.textContent = W.name;

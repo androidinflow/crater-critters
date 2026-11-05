@@ -17,11 +17,11 @@ function scoreBlast(c, x, y, R, D) {
 // Forward-simulate a shot with the *same* integrator the game uses (gravity, wind, bounces),
 // against the current terrain. Returns the detonation point or null.
 function simulateShot(c, w, facing, aim, power) {
-  const P0 = PROJ[w], dx = Math.cos(aim) * facing, dy = Math.sin(aim);
-  const b = { x: c.x + dx * (c.r + 5), y: c.y + dy * (c.r + 5), vx: dx * power * CFG.MAX_POWER, vy: dy * power * CFG.MAX_POWER,
+  const P0 = PROJ[w], dx = Math.cos(aim) * facing, dy = Math.sin(aim), sp = power * CFG.MAX_POWER * (w === 'launcher' ? 1.3 : 1);
+  const b = { x: c.x + dx * (c.r + 5), y: c.y + dy * (c.r + 5), vx: dx * sp, vy: dy * sp,
     r: P0.r, bounce: P0.bounce, friction: P0.friction, windF: P0.windF, grav: 1, hit: null };
   if (circleHits(b.x, b.y, b.r)) return null;
-  const maxT = P0.fuse ? 180 : 420;  // 3 s fuse, or up to 7 s of flight
+  const maxT = P0.fuse ? Math.round(Math.min(5, P0.fuseT ?? 3) * 60) : 420;  // the weapon's fuse, or up to 7 s of flight
   for (let t = 0; t < maxT; t++) {
     moveBody(b, CFG.DT);
     if (b.x < -60 || b.x > CFG.W + 60 || b.y > g.waterY) return null;
@@ -55,7 +55,37 @@ function* aiPlan(c) {
     if (has('freeze') && d < 630 && e.frozen <= 0 && lineClear(c.x, c.y, e.x, e.y)) consider({ w: 'freeze', facing, angle, tx: e.x, score: 10 + Math.min(30, e.hp - e.pending) * 0.3 });
     if (has('balloon') && e.frozen <= 0) consider({ w: 'balloon', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: 16 + Math.abs(g.wind) * 18 + (willFall(e.x + Math.sign(g.wind || 1) * 300, e.y) ? 30 : 0) });
     if (has('rifle') && d < 1100 && lineClear(c.x, c.y, e.x, e.y)) consider({ w: 'rifle', facing, angle, tx: e.x, score: Math.min(38, e.hp - e.pending) + (willFall(e.x + facing * 30, e.y) ? 15 : 0) + (e.hp - e.pending <= 38 ? 25 : 0) - d * 0.005 });
+    // ---- the big arsenal ----
+    const hp = e.hp - e.pending, los = d < 700 && lineClear(c.x, c.y, e.x, e.y), fallF = k => willFall(e.x + facing * k, e.y);
+    if (has('handgun') && d < 520 && los) consider({ w: 'handgun', facing, angle, tx: e.x, score: Math.min(35, hp) - d * 0.02 });
+    if (has('uzi') && d < 420 && los) consider({ w: 'uzi', facing, angle, tx: e.x, score: Math.min(40, hp) + (fallF(60) ? 25 : 0) - d * 0.03 });
+    if (has('minigun') && d < 420 && los) consider({ w: 'minigun', facing, angle, tx: e.x, score: Math.min(60, hp) * 0.8 + (fallF(70) ? 30 : 0) - d * 0.03 });
+    if (has('railgun') && d < 900) consider({ w: 'railgun', facing, angle, tx: e.x, score: Math.min(45, hp) + 4 + (hp <= 45 ? 20 : 0) });
+    if (has('magic')) consider({ w: 'magic', facing, angle, tx: e.x, score: scoreBlast(c, e.x, e.y, 40, 50) * 0.9 + 6 });
+    if (has('virus') && los && e.poison <= 0) { let n = 0; for (const o of g.critters) if (o.alive && o !== e && Math.hypot(o.x - e.x, o.y - e.y) < 70) n += o.team !== team ? 1 : -1; consider({ w: 'virus', facing, angle, tx: e.x, score: 14 + n * 6 }); }
+    if (has('dragon') && d < 120 && los) consider({ w: 'dragon', facing, angle, tx: e.x, score: 24 + (fallF(120) ? 60 : 0) });
+    if (has('waterpistol') && d < 85) consider({ w: 'waterpistol', facing, angle, tx: e.x, score: fallF(80) ? 55 : 2 });
+    if (has('dubstep') && d < 125) consider({ w: 'dubstep', facing, angle, tx: e.x, score: 12 + (fallF(90) ? 55 : 0) });
+    if (has('axe') && d < 36) consider({ w: 'axe', facing, angle, tx: e.x, score: Math.ceil(hp / 2) + 4 });
+    if (has('punch') && d < 36) consider({ w: 'punch', facing, angle, tx: e.x, score: 38 });
+    if (has('prod') && d < 32 && fallF(30)) consider({ w: 'prod', facing, angle, tx: e.x, score: 70 });
+    if (has('chainsaw') && d < 44) consider({ w: 'chainsaw', facing, angle, tx: e.x, score: 25 + (fallF(60) ? 40 : 0) });
+    if (has('kamikaze') && d < 220 && c.hp - c.pending < 30 && Math.abs(dy) < 60) consider({ w: 'kamikaze', facing, angle, tx: e.x, score: scoreBlast(c, e.x, e.y, 60, 60) + 20 - (c.hp - c.pending) });
+    if (has('suicide') && d < 55 && c.hp - c.pending < 25) consider({ w: 'suicide', facing, angle, tx: e.x, score: scoreBlast(c, c.x, c.y, 60, 50) + 10 });
+    for (const [w, R, D, bonus] of [['napalm', 60, 40, 4], ['poisonstrike', 70, 30, 2], ['frogstrike', 70, 40, 4], ['homingstrike', 50, 45, 8], ['molestrike', 60, 50, 2], ['carpet', 70, 36, 2], ['minestrike', 60, 35, 0]])
+      if (has(w)) consider({ w, tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: scoreBlast(c, e.x, e.y, R, D) * 0.8 + bonus });
+    if (has('waterstrike')) consider({ w: 'waterstrike', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: willFall(e.x + 60, e.y) || willFall(e.x - 60, e.y) ? 45 : 3 });
+    if (has('comet')) consider({ w: 'comet', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: scoreBlast(c, e.x, e.y + 10, 80, 70) + 8 });
+    if (has('ion')) { let s = Math.min(45, hp) + 10; for (const o of g.critters) if (o.alive && o !== e && Math.abs(o.x - e.x) < 20) s += o.team !== team ? 30 : -45; consider({ w: 'ion', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: s }); }
+    if (has('buster')) consider({ w: 'buster', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: scoreBlast(c, e.x, e.y + 30, 55, 55) + 4 });
+    if (has('abduct')) consider({ w: 'abduct', tx: e.x, ty: e.y, facing: c.facing, angle: c.aim, score: 12 + (hp > 60 ? 10 : 0) });
+    if (c.mode === 'ground' && Math.abs(dy) < 50 && d < 320 && d > 30)
+      for (const [w, sc] of [['cows', 40], ['granny', 45], ['ferrets', 34], ['rhino', 30], ['boar', 38]]) if (has(w)) consider({ w, facing, angle: c.aim, tx: e.x, score: sc - d * 0.05 });
+    if (has('sentry') && c.mode === 'ground' && d < 300 && d > 60 && los) consider({ w: 'sentry', facing, angle: c.aim, tx: c.x, score: 16 });
+    if (has('gaspump') && c.mode === 'ground' && d < 90 && d > 30) consider({ w: 'gaspump', facing, angle: c.aim, tx: c.x, score: 22 });
+    if (has('megamine') && c.mode === 'ground' && d < 120 && d > 50) consider({ w: 'megamine', facing, angle: c.aim, tx: c.x, score: 14 });
   }
+  if (has('nuke')) { let s = -8; for (const o of g.critters) if (o.alive) { const en = o.team !== team; s += en ? 5 : -5; if (o.y > g.waterY - 60) s += en ? 60 : -80; } consider({ w: 'nuke', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
   // map-wide weapons: judged on the whole board rather than one enemy
   if (has('quake') && c.mode === 'ground') { let s = 6; for (const o of g.critters) if (o.alive && o !== c) { const edge = willFall(o.x + 30, o.y) || willFall(o.x - 30, o.y); s += o.team !== team ? 3 + (edge ? 22 : 0) : -(3 + (edge ? 30 : 0)); } consider({ w: 'quake', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
   if (has('flood')) { let s = -4; for (const o of g.critters) if (o.alive && o.y > g.waterY - 75) s += o.team !== team ? 70 : -90; consider({ w: 'flood', facing: c.facing, angle: c.aim, tx: c.x, score: s }); }
@@ -63,21 +93,16 @@ function* aiPlan(c) {
   yield;
   // Brute-force trajectory search: sweep aim angle × launch power for each ballistic weapon,
   // simulate, and score the detonation point. Spread across frames via `yield`.
-  const ballistic = ['rocket', 'bomb', 'melon', 'skunk', 'acorn', 'mortar', 'vortex', 'frog'].filter(has);
-  const RD = { rocket: [50, 50], bomb: [48, 48], melon: [58, 50], skunk: [60, 32], acorn: [95, 90], mortar: [40, 50], vortex: [120, 26], frog: [75, 40] };
+  const ballistic = ['rocket', 'bomb', 'melon', 'skunk', 'acorn', 'mortar', 'vortex', 'frog', 'banana', 'holy', 'launcher', 'molotov', 'gascan', 'battery', 'starburst', 'fridge', 'molebomb'].filter(has);
+  const RD = { rocket: [50, 50], bomb: [48, 48], melon: [58, 50], skunk: [60, 32], acorn: [95, 90], mortar: [40, 50], vortex: [120, 26], frog: [75, 40],
+    banana: [80, 40], holy: [100, 100], launcher: [46, 44], molotov: [40, 30], gascan: [55, 24], battery: [40, 30], starburst: [60, 30], fridge: [40, 40], molebomb: [50, 50] };
+  const TWEAK = { melon: -8, bomb: -1, skunk: -6, acorn: 4, mortar: -3, vortex: -10, frog: -4, holy: 6, banana: -4, gascan: -6, molotov: -2, battery: -6, fridge: -4, molebomb: -3 };
   let n = 0;
   for (const w of ballistic) for (const facing of [-1, 1]) for (let a = -1.45; a <= 0.75; a += 0.08) for (let p = 0.2; p <= 1.001; p += 0.05) {
     const imp = simulateShot(c, w, facing, a, p);
     if (imp) {
       const [R, D] = RD[w];
-      let s = scoreBlast(c, imp.x, imp.y, R, D);
-      if (w === 'melon') s -= 8;
-      if (w === 'bomb') s -= 1;
-      if (w === 'skunk') s -= 6;
-      if (w === 'acorn') s += 4;
-      if (w === 'mortar') s -= 3;
-      if (w === 'vortex') s -= 10;
-      if (w === 'frog') s -= 4;
+      let s = scoreBlast(c, imp.x, imp.y, R, D) + (TWEAK[w] || 0);
       consider({ w, facing, angle: a, power: p, score: s, tx: imp.x, ty: imp.y, fuse: 3 });
     }
     if (++n % 24 === 0) yield;

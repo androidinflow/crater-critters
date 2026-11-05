@@ -73,6 +73,8 @@ const Sfx = {
   hum() { if (this.ok('hum', 250)) this.tone(90, 0.3, 'sawtooth', 0.08, 60); },
   flame() { if (this.ok('flame', 200)) this.noise(0.3, 0.25, 900, 300, 'bandpass', 0.6); },
   swoosh() { if (this.ok('swoosh', 200)) this.noise(0.18, 0.12, 400, 1800, 'bandpass', 2); },
+  pew() { if (this.ok('pew', 40)) { this.noise(0.06, 0.3, 3000, 500); this.tone(700, 0.05, 'square', 0.06, 200); } },
+  choir() { [392, 494, 587, 784].forEach((f, i) => { this.tone(f, 1.1, 'triangle', 0.08, null, i * 0.02); this.tone(f * 1.005, 1.1, 'sine', 0.06, null, i * 0.02); }); },
   mortar() { this.tone(160, 0.15, 'square', 0.14, 60); this.noise(0.12, 0.3, 1200, 200); },
 };
 
