@@ -1,29 +1,9 @@
 // ============================== UI (HUD + DOM overlays) ==============================
-const HUD_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Roboto, system-ui, sans-serif';
-// In-world text (names, damage numbers, banners): a soft dark outline keeps it legible over anything
 function txt(t, x, y, size, col, align = 'center', stroke = 4) {
-  ctx.font = `600 ${size}px ${HUD_FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = stroke * 0.7; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y);
+  ctx.font = `bold ${size}px "Trebuchet MS", sans-serif`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(20,12,6,0.9)'; ctx.lineWidth = stroke; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y);
 }
-// HUD text: no outline, just a 1px shadow so it reads on glass
-function hud(t, x, y, size, col = '#f5f7fb', align = 'left', weight = 600) {
-  ctx.font = `${weight} ${size}px ${HUD_FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillText(t, x, y + 1); ctx.fillStyle = col; ctx.fillText(t, x, y);
-}
-// Liquid-glass surface: tinted translucent fill, 1px light edge, a brighter highlight along the top
-function panel(x, y, w, h, r = 16, fill = 'rgba(14,18,30,0.46)') {
-  rr(ctx, x, y, w, h, r); ctx.fillStyle = fill; ctx.fill();
-  const gl = ctx.createLinearGradient(0, y, 0, y + h); gl.addColorStop(0, 'rgba(255,255,255,0.14)'); gl.addColorStop(0.5, 'rgba(255,255,255,0.03)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, Math.min(h, r + 2)); ctx.clip(); rr(ctx, x + 1, y + 1, w - 2, h - 2, r - 1); ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke(); ctx.restore();
-}
-function glassCircle(x, y, r, fill = 'rgba(14,18,30,0.46)') {
-  circ(ctx, x, y, r); ctx.fillStyle = fill; ctx.fill();
-  const gl = ctx.createLinearGradient(0, y - r, 0, y + r); gl.addColorStop(0, 'rgba(255,255,255,0.16)'); gl.addColorStop(0.55, 'rgba(255,255,255,0.02)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.32)'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.beginPath(); ctx.arc(x, y, r - 1.5, -Math.PI * 0.85, -Math.PI * 0.15); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.stroke();
-}
+function panel(x, y, w, h, fill = 'rgba(255,246,227,0.92)') { rr(ctx, x, y, w, h, 12); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 3; ctx.stroke(); }
 // Minimap: cached shrunken copy of the terrain bitmap (refreshed when the terrain version changes)
 // with critter dots and the camera window. Click/tap it to look there.
 const Mini = {
@@ -35,20 +15,18 @@ const Mini = {
     if (!T && w < 720) return;
     if (!this.cvs) { this.cvs = document.createElement('canvas'); this.cvs.width = 240; this.cvs.height = 120; }
     if (this.ver !== Terrain.version) { this.ver = Terrain.version; const x = this.cvs.getContext('2d'); x.clearRect(0, 0, 240, 120); x.drawImage(Terrain.cvs, 0, 0, CFG.W, CFG.H, 0, 0, 240, 120); }
-    const rows = g.teams.length, mw = T ? 140 : 192, mh = mw / 2, mx = w / 2 - mw / 2;
-    // touch: top centre, or below the team bars on a narrow (portrait) phone where it would cover the weapon panel
-    const my = T ? (w < 600 ? 14 + 70 * (w < 760 ? 0.8 : 1) + 22 + 46 + rows * (rows > 4 ? 12 : 18) + 10 : 12) : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
+    const rows = g.teams.length, mw = T ? 140 : 192, mh = mw / 2, mx = w / 2 - mw / 2, my = T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
     this.rect = { x: mx, y: my, w: mw, h: mh };
     ctx.save();
-    panel(mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.save(); rr(ctx, mx, my, mw, mh, 6); ctx.clip();
+    rr(ctx, mx - 3, my - 3, mw + 6, mh + 6, 6); ctx.fillStyle = 'rgba(20,12,6,0.75)'; ctx.fill();
     const sk = Terrain.theme.sky; ctx.fillStyle = Terrain.cavern ? '#2a1e3d' : sk[1]; ctx.globalAlpha = 0.6; ctx.fillRect(mx, my, mw, mh); ctx.globalAlpha = 1;
     ctx.drawImage(this.cvs, mx, my, mw, mh);
     const wy = my + g.waterY / CFG.H * mh; ctx.fillStyle = Terrain.theme.water[1]; ctx.fillRect(mx, wy, mw, my + mh - wy);
     for (const c of g.critters) if (c.alive) { const px = mx + c.x / CFG.W * mw, py = my + c.y / CFG.H * mh, act = c === g.active && g.state === 'turn';
-      ctx.fillStyle = c.team.color; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1; circ(ctx, px, py, act ? 3.5 + Math.sin(g.time * 8) : 2.4); ctx.fill(); ctx.stroke(); }
+      ctx.fillStyle = c.team.color; ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 1; circ(ctx, px, py, act ? 3.5 + Math.sin(g.time * 8) : 2.4); ctx.fill(); ctx.stroke(); }
     ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1;
     ctx.strokeRect(mx + clamp(vx0, 0, CFG.W) / CFG.W * mw, my + clamp(vy0, 0, CFG.H) / CFG.H * mh, (clamp(vx1, 0, CFG.W) - clamp(vx0, 0, CFG.W)) / CFG.W * mw, (clamp(vy1, 0, CFG.H) - clamp(vy0, 0, CFG.H)) / CFG.H * mh);
-    ctx.restore(); ctx.restore();
+    ctx.restore();
   },
   hit(sx, sy) {   // returns true when a click landed on the minimap (and moves the camera there)
     const r = this.rect; if (!r || sx < r.x || sx > r.x + r.w || sy < r.y || sy > r.y + r.h) return false;
@@ -64,23 +42,23 @@ function drawHUD() {
     const s = worldToScreen(c.x, c.y - c.r * 1.6); if (s.x < -60 || s.x > w + 60 || s.y < -60 || s.y > h + 60) continue;
     txt(c.name, s.x, s.y - 26, 12, shade(c.team.color, 0.25), 'center', 3);
     const hp = Math.max(0, Math.ceil(c.hp)), bw = 30;
-    rr(ctx, s.x - bw / 2, s.y - 18, bw, 14, 7); ctx.fillStyle = 'rgba(14,18,30,0.6)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.font = `600 11px ${HUD_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = c.poison > 0 ? '#9be15d' : shade(c.team.color, 0.35); ctx.fillText(hp, s.x, s.y - 11);
+    rr(ctx, s.x - bw / 2, s.y - 18, bw, 14, 4); ctx.fillStyle = 'rgba(20,12,6,0.85)'; ctx.fill();
+    ctx.font = 'bold 11px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = c.poison > 0 ? '#8ac926' : c.team.color; ctx.fillText(hp, s.x, s.y - 10.5);
     if (c === g.active && g.state === 'turn' && g.time - g.turnStartT < 3) {
-      const by = s.y - 44 + Math.sin(g.time * 8) * 4; ctx.fillStyle = c.team.color; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+      const by = s.y - 44 + Math.sin(g.time * 8) * 4; ctx.fillStyle = c.team.color; ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(s.x - 8, by - 10); ctx.lineTo(s.x + 8, by - 10); ctx.lineTo(s.x, by); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
     if (c.say) {
-      ctx.font = `500 13px ${HUD_FONT}`; const tw = ctx.measureText(c.say.text).width + 18, by = s.y - 66;
+      ctx.font = 'bold 13px "Trebuchet MS", sans-serif'; const tw = ctx.measureText(c.say.text).width + 16, by = s.y - 66;
       ctx.globalAlpha = Math.min(1, c.say.t * 3);
-      rr(ctx, s.x - tw / 2, by - 12, tw, 24, 12); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(s.x - 5, by + 11); ctx.lineTo(s.x, by + 18); ctx.lineTo(s.x + 5, by + 11); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill();
-      ctx.fillStyle = '#16181f'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText(c.say.text, s.x, by); ctx.globalAlpha = 1;
+      rr(ctx, s.x - tw / 2, by - 12, tw, 24, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s.x - 5, by + 11); ctx.lineTo(s.x, by + 19); ctx.lineTo(s.x + 5, by + 11); ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.fillStyle = '#2b1d12'; ctx.textBaseline = 'middle'; ctx.fillText(c.say.text, s.x, by); ctx.globalAlpha = 1;
     }
   }
   for (const t of g.texts) { const s = worldToScreen(t.x, t.y); ctx.globalAlpha = clamp((t.life - t.t) * 2, 0, 1); txt(t.text, s.x, s.y - t.t * 34, t.size * (1 + Math.max(0, 0.3 - t.t)), t.col); }
   ctx.globalAlpha = 1;
-  if (g.state === 'placement') { txt('Critters incoming!', w / 2, 60, 28, '#fff'); return; }
+  if (g.state === 'placement') { txt('Critters incoming!', w / 2, 60, 30, '#ffd23f'); return; }
   const c = g.active, team = c && c.team;
   // Layout: desktop puts timer/wind at the bottom corners; touch moves them up out of the thumbs' way
   const T = UI.touch, ps = T && w < 760 ? 0.8 : 1;
@@ -90,52 +68,50 @@ function drawHUD() {
   if (team && g.state === 'turn') {
     const W = WEAP[g.weapon];
     ctx.save(); ctx.translate(14, 14); ctx.scale(ps, ps); ctx.translate(-14, -14);
-    panel(14, 14, 276, 72, 18);
-    rr(ctx, 24, 24, 52, 52, 14); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
-    ctx.save(); ctx.translate(50, 51); drawIcon(ctx, W.id, 38); ctx.restore();
-    hud(W.name, 88, 33, 15);
-    const a = team.ammo[W.id] ?? 0;
-    hud(a === -1 ? 'Unlimited' : a === 0 ? 'No ammo' : `${a} left`, 88, 52, 12, a === 0 ? '#ff7a8a' : 'rgba(245,247,251,0.7)', 'left', 500);
+    panel(14, 14, 270, 70);
+    ctx.save(); ctx.translate(48, 49); drawIcon(ctx, W.id, 40); ctx.restore();
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = '#2b1d12'; ctx.font = 'bold 16px "Trebuchet MS", sans-serif';
+    ctx.fillText(W.name, 82, 32);
+    const a = team.ammo[W.id] ?? 0; ctx.font = 'bold 13px "Trebuchet MS", sans-serif';
+    ctx.fillStyle = a === 0 ? '#c1121f' : '#6b4b2a'; ctx.fillText(a === -1 ? 'Ammo: ∞' : `Ammo: ${a}`, 82, 51);
     let hint = W.hint.replace('{fuse}', g.fuse).replace('{bee}', g.target ? 'Target locked! Hold Space.' : 'Click to set a target.');
     if (W.air && Terrain.cavern) hint = 'No air-drops in caverns!';
     if (g.robot) hint = g.robot.hint || 'Space: KABOOM!'; else if (g.shotsLeft === 1) hint = 'One more shot!';
     if (c.mode === 'chute') hint = '←→ drift · Space: close chute'; if (c.mode === 'kami') hint = 'BANZAI!';
     if (c.mode === 'rope') hint = '←→ swing · ↑↓ climb · Space let go'; if (c.mode === 'jet') hint = `↑ thrust · fuel ${Math.max(0, c.fuel).toFixed(1)}s`;
     if (T) hint = hint.replace('Hold Space', 'Hold FIRE').replace('Space again', 'FIRE again').replace('Space:', 'FIRE:').replace('Click', 'Tap').replace('click', 'tap').replace('keys 1–5', 'tap map').replace(' (tap map)', '');
-    hud(hint, 88, 69, 11, 'rgba(245,247,251,0.6)', 'left', 500);
+    ctx.font = '12px "Trebuchet MS", sans-serif'; ctx.fillStyle = '#2b1d12'; ctx.fillText(hint, 82, 69);
     ctx.restore();
   }
   // timer
   {
     ctx.save(); ctx.translate(L.tx, L.ty); ctx.scale(L.ts, L.ts);
     const tx = 0, ty = 0, col = team ? team.color : '#aaa';
-    glassCircle(tx, ty, 38);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 5; ctx.lineCap = 'round'; circ(ctx, tx, ty, 31); ctx.stroke();
+    circ(ctx, tx, ty, 38); ctx.fillStyle = 'rgba(255,246,227,0.92)'; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 3; ctx.stroke();
     if (g.state === 'turn') {
       const frac = clamp(g.turnT / (g.retreat ? CFG.RETREAT : g.settings.turnTime), 0, 1);
-      ctx.strokeStyle = g.retreat ? '#ff7b39' : col; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(tx, ty, 31, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke(); ctx.lineCap = 'butt';
+      ctx.strokeStyle = g.retreat ? '#ff7b39' : col; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(tx, ty, 31, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
       const v = Math.ceil(Math.max(0, g.turnT));
-      hud(v, tx, ty + 1, 26, g.turnT < 5 && (g.time * 4 | 0) % 2 ? '#ff4d6d' : '#fff', 'center', 600);
-      if (g.retreat) txt('Run!', tx, ty - 50, 16, '#ff7b39');
-    } else { ctx.lineCap = 'butt'; hud('…', tx, ty, 24, 'rgba(245,247,251,0.6)', 'center'); }
-    if (g.sd) txt('Sudden death', T ? tx : tx + 46, T ? ty + 52 : ty - 46, 13, '#ff4d6d', T ? 'center' : 'left');
-    else if (g.settings.sdMinutes > 0) { const left = Math.max(0, g.settings.sdMinutes * 60 - g.time); txt(`${left / 60 | 0}:${String(left % 60 | 0).padStart(2, '0')}`, tx, ty + 52, 12, 'rgba(255,255,255,0.85)'); }
+      txt(v, tx, ty + 1, 28, g.turnT < 5 && (g.time * 4 | 0) % 2 ? '#ff4d6d' : (g.retreat ? '#ff7b39' : col));
+      if (g.retreat) txt('RUN!', tx, ty - 50, 18, '#ff7b39');
+    } else txt('…', tx, ty, 26, '#888');
+    if (g.sd) txt('SUDDEN DEATH', T ? tx : tx + 46, T ? ty + 52 : ty - 46, 14, '#ff4d6d', T ? 'center' : 'left');
+    else if (g.settings.sdMinutes > 0) { const left = Math.max(0, g.settings.sdMinutes * 60 - g.time); txt(`${left / 60 | 0}:${String(left % 60 | 0).padStart(2, '0')}`, tx, ty + 52, 12, '#fff'); }
     ctx.restore();
   }
   // wind meter
   {
     const ww = L.ww, wx = L.wx, wy = L.wy;
-    panel(wx, wy, ww, 36, 18);
-    hud('Wind', wx + 14, wy + 18, 11, 'rgba(245,247,251,0.7)', 'left', 600);
-    const bx = wx + 52, bwid = ww - 66, mid = bx + bwid / 2, len = g.wind * (bwid / 2 - 4);
-    rr(ctx, bx, wy + 12, bwid, 12, 6); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
-    ctx.save(); rr(ctx, Math.min(mid, mid + len), wy + 12, Math.abs(len), 12, 6); ctx.clip();
-    ctx.fillStyle = 'rgba(95,176,255,0.55)'; ctx.fillRect(bx, wy + 12, bwid, 12);
+    panel(wx, wy, ww, 36);
+    ctx.fillStyle = '#2b1d12'; ctx.font = 'bold 11px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.fillText('WIND', wx + ww / 2, wy - 8);
+    const mid = wx + ww / 2, len = g.wind * (ww / 2 - 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(wx + 10, wy + 12, ww - 20, 12);
+    ctx.save(); ctx.beginPath(); ctx.rect(Math.min(mid, mid + len), wy + 10, Math.abs(len), 16); ctx.clip();
     const dir = Math.sign(g.wind) || 1;
-    for (let i = -2; i < 22; i++) { const px = bx + ((i * 14 + g.time * 40 * dir) % (bwid + 28)); ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.45)';
-      ctx.beginPath(); ctx.moveTo(px, wy + 14); ctx.lineTo(px + 5 * dir, wy + 18); ctx.lineTo(px, wy + 22); ctx.lineTo(px + 4 * dir, wy + 22); ctx.lineTo(px + 9 * dir, wy + 18); ctx.lineTo(px + 4 * dir, wy + 14); ctx.fill(); }
+    for (let i = -2; i < 22; i++) { const px = wx + ((i * 14 + g.time * 40 * dir) % (ww + 28)); ctx.fillStyle = i % 2 ? '#3a86ff' : '#5fa8e8';
+      ctx.beginPath(); ctx.moveTo(px, wy + 12); ctx.lineTo(px + 7 * dir, wy + 18); ctx.lineTo(px, wy + 24); ctx.lineTo(px + 6 * dir, wy + 24); ctx.lineTo(px + 13 * dir, wy + 18); ctx.lineTo(px + 6 * dir, wy + 12); ctx.fill(); }
     ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mid, wy + 9); ctx.lineTo(mid, wy + 27); ctx.stroke();
+    ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mid, wy + 8); ctx.lineTo(mid, wy + 28); ctx.stroke();
   }
   // team totals
   {
@@ -145,11 +121,9 @@ function drawHUD() {
     if (bw > 120) for (let i = 0; i < rows; i++) {
       const t = g.teams[i], tot = t.critters.reduce((s, c) => s + (c.alive ? Math.max(0, c.hp) : 0), 0), y = y0 + i * rowH;
       const bar = clamp(tot / (CFG.HP * (g.perTeam || CFG.PER_TEAM)), 0, 1.4) * (bw - 120);
-      if (T) txt(t.name, x0 + 118 + Math.max(4, bar) + 6, y + 8, 11, '#fff', 'left', 3); else txt(t.name, x0 + 112, y + 8, 12, '#fff', 'right', 3);
-      const bh = rowH - 6; rr(ctx, x0 + 118, y + 2, bw - 120, bh, bh / 2); ctx.fillStyle = 'rgba(14,18,30,0.4)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1; ctx.stroke();
-      rr(ctx, x0 + 119, y + 3, Math.max(bh - 2, Math.min(bar, bw - 122)), bh - 2, (bh - 2) / 2); ctx.fillStyle = t.color; ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.28)'; rr(ctx, x0 + 119, y + 3, Math.max(bh - 2, Math.min(bar, bw - 122)), (bh - 2) / 2, (bh - 2) / 2); ctx.fill();
-      if (g.state === 'turn' && team === t) { ctx.fillStyle = '#fff'; circ(ctx, T ? x0 + 118 + (bw - 120) + 8 : x0 + 118 + (bw - 120) + 10, y + 8, 3); ctx.fill(); }
+      if (T) txt(t.name, x0 + 118 + Math.max(4, bar) + 6, y + 8, 11, shade(t.color, 0.2), 'left', 3); else txt(t.name, x0 + 112, y + 8, 12, shade(t.color, 0.2), 'right', 3);
+      rr(ctx, x0 + 118, y + 2, Math.max(4, bar), rowH - 5, 5); ctx.fillStyle = t.color; ctx.fill(); ctx.strokeStyle = '#2b1d12'; ctx.lineWidth = 2; ctx.stroke();
+      if (g.state === 'turn' && team === t && !T) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x0 + 116 + bar + 10, y + 8); ctx.lineTo(x0 + 116 + bar + 18, y + 3); ctx.lineTo(x0 + 116 + bar + 18, y + 13); ctx.fill(); }
     }
   }
   // banner
@@ -164,7 +138,7 @@ function drawHUD() {
   if (Net.role === 'guest' && Net.hostLost) txt('Host disconnected…', w / 2, h * 0.5, 22, '#ff4d6d');
   if (g.online && Net.code) { // room code, so a friend can still join / rejoin mid-game
     const ry = T ? (Mini.rect ? Mini.rect.y + Mini.rect.h + 12 : 20) : 14;
-    ctx.globalAlpha = 0.9; txt(`Room ${Net.code}`, w / 2, ry, T ? 12 : 13, '#fff', 'center', 3); ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.9; txt(`Room ${Net.code}`, w / 2, ry, T ? 12 : 13, '#ffd23f', 'center', 3); ctx.globalAlpha = 1;
   }
   if (T && h > w * 1.15) { ctx.globalAlpha = 0.7; txt('Tip: turn your phone sideways ↻', w / 2, h - 210, 13, '#fff', 'center', 3); ctx.globalAlpha = 1; }
   if (g.state === 'turn' && g.ai) txt(g.ai.st === 'think' ? 'Thinking…' : '', w / 2, 72, 14, '#fff');
