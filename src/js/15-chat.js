@@ -59,7 +59,7 @@ const Full = {
     if (ios && !this.supported() && !this.standalone()) $('iosTip').classList.remove('hidden');
     $('tFull').classList.toggle('hidden', this.standalone() || (!this.supported() && !ios));
     $('pauseFull').onclick = () => this.toggle();
-    const upd = () => { $('tFull').textContent = this.active() ? '✕' : '⛶'; setTimeout(resize, 60); };
+    const upd = () => { $('tFull').classList.toggle('fs', this.active()); setTimeout(resize, 60); };
     document.addEventListener('fullscreenchange', upd); document.addEventListener('webkitfullscreenchange', upd);
     // home-screen icon for iOS: render the mascot to a PNG
     try {

@@ -176,6 +176,21 @@ const MapImage = {
     });
     rd.readAsDataURL(file);
   },
+  // Flip the stored image (h = mirror left/right, v = upside down) and re-preview
+  flip(axis) {
+    if (!this.ready()) return;
+    const im = this.img, cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; const x = cv.getContext('2d');
+    if (axis === 'h') { x.translate(cv.width, 0); x.scale(-1, 1); } else { x.translate(0, cv.height); x.scale(1, -1); }
+    x.drawImage(im, 0, 0);
+    const url = cv.toDataURL('image/png'); try { localStorage.setItem(this.KEY, url); } catch (e) { }
+    this.setSrc(url, () => { this.thumb(); if (g.state === 'menu') startBackdrop(); });
+  },
+  thumb() {
+    const cv = $('mapThumb'); if (!cv) return; const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height);
+    if (!this.ready()) return;
+    const im = this.img, k = Math.min(cv.width / im.naturalWidth, cv.height / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k;
+    x.drawImage(im, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+  },
   stamp(T) {
     const im = this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
     const k = Math.min(maxW / im.naturalWidth, maxH / im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
@@ -228,8 +243,8 @@ const UI = {
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('scheme', 'scheme');
     bindSel('mapStyle', 'map', false, () => { this.buildMenu(); startBackdrop(); }); bindSel('theme', 'theme', false, startBackdrop);
     $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
-    if (settings.map === 'Custom') $('mapNote').textContent = MapImage.ready() ? 'Custom map: transparent or white pixels are air. Local games only (beta).' : 'Pick an image below. Transparent or white pixels are air.';
-    else $('mapNote').textContent = 'The backdrop previews your map & theme.';
+    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Custom maps work in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); $('mapFlipH').disabled = $('mapFlipV').disabled = !MapImage.ready(); }
+    else $('mapNote').textContent = 'The backdrop previews your map and theme.';
   },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
   hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
@@ -302,6 +317,9 @@ const UI = {
 $('startBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); UI.hideAll(); newGame(); };
 $('helpBtn').onclick = () => UI.toggleHelp();
 $('mapFile').onchange = e => { const f = e.target.files && e.target.files[0]; if (f) MapImage.load(f); e.target.value = ''; };
+$('mapPick').onclick = () => $('mapFile').click();
+$('mapFlipH').onclick = () => MapImage.flip('h');
+$('mapFlipV').onclick = () => MapImage.flip('v');
 $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
 $('pauseHelpBtn').onclick = () => UI.toggleHelp();

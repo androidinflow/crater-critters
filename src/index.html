@@ -20,11 +20,20 @@
 
 <!-- ===== Touch controls (shown on touch devices) ===== -->
 <div id="touch" class="hidden">
-  <div class="dpad"><button data-k="ArrowUp" aria-label="Aim up">▲</button><button data-k="ArrowLeft" aria-label="Walk left">◀</button>
-    <button data-k="ArrowRight" aria-label="Walk right">▶</button><button data-k="ArrowDown" aria-label="Aim down">▼</button></div>
-  <div class="acts"><button id="tWeap" aria-label="Weapons">ARMS</button><button data-k="Enter" aria-label="Jump">JUMP</button><button data-k="Backspace" aria-label="Backflip">FLIP</button><button data-k="Space" aria-label="Fire">FIRE</button></div>
-  <button id="tPause" aria-label="Pause">❚❚</button>
-  <button id="tFull" aria-label="Fullscreen">⛶</button>
+  <div class="dpad">
+    <button data-k="ArrowUp" aria-label="Aim up"><svg viewBox="0 0 24 24"><path d="M12 5.5l7.5 10h-15z"/></svg></button>
+    <button data-k="ArrowLeft" aria-label="Walk left"><svg viewBox="0 0 24 24"><path d="M5.5 12l10-7.5v15z"/></svg></button>
+    <button data-k="ArrowRight" aria-label="Walk right"><svg viewBox="0 0 24 24"><path d="M18.5 12l-10 7.5v-15z"/></svg></button>
+    <button data-k="ArrowDown" aria-label="Aim down"><svg viewBox="0 0 24 24"><path d="M12 18.5l-7.5-10h15z"/></svg></button>
+  </div>
+  <div class="acts">
+    <button id="tWeap" aria-label="Weapons"><svg viewBox="0 0 24 24"><circle cx="10" cy="14.5" r="7"/><path d="M14.5 8.5l3.5-4.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="19.2" cy="3.4" r="2"/></svg><span>Arms</span></button>
+    <button data-k="Enter" aria-label="Jump"><svg viewBox="0 0 24 24"><path d="M4 19.5c1.5-8 6-12.5 12.5-13.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M13.5 3.5l7 2.2-4.2 5.8z"/></svg><span>Jump</span></button>
+    <button data-k="Backspace" aria-label="Backflip"><svg viewBox="0 0 24 24"><path d="M18.5 8.5A7.5 7.5 0 1 0 20 13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M21 3v7h-7z"/></svg><span>Flip</span></button>
+    <button data-k="Space" aria-label="Fire"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="12" r="2.2"/></svg><span>Fire</span></button>
+  </div>
+  <button id="tPause" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg></button>
+  <button id="tFull" aria-label="Fullscreen"><svg class="enter" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="exit" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 </div>
 
 <!-- ===== Chat (online matches) ===== -->
@@ -39,33 +48,41 @@
 
 <!-- ===== Main menu ===== -->
 <div id="menu" class="overlay">
-  <div class="panel" style="width:min(640px,94vw)">
-    <canvas id="mascot" width="420" height="96"></canvas>
-    <h1 class="logo">Crater Critters</h1>
-    <p class="tag">Small. Round. Extremely explosive.</p>
-    <p class="small center" id="mapNote" style="margin:-4px 0 8px">The backdrop previews your map &amp; theme.</p>
-    <div class="row center" id="profileRow"><label for="profName">You</label><input type="text" id="profName" maxlength="20" placeholder="Your name" autocomplete="nickname"><button id="boardBtn">🏆 Leaderboard</button></div>
-    <p class="small center hidden" id="iosTip">📱 iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
-    <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
-    <div class="row"><label>Critters each</label><div class="seg" id="perTeam"></div><span class="small">2 each is roomier for big games</span></div>
-    <div id="teamList"></div>
-    <div class="grid2">
-      <div class="row"><label>Turn time</label><select id="turnTime"><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option></select></div>
-      <div class="row"><label>Sudden death</label><select id="sdMinutes"><option value="3">3 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="0">Never</option></select></div>
-      <div class="row"><label>Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option><option value="Custom">Custom image (beta)</option></select></div>
-      <div class="row hidden" id="mapFileRow"><label>Image</label><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif"></div>
-      <div class="row"><label>Theme</label><select id="theme"><option>Meadow</option><option>Snow</option><option>Desert</option><option>Volcanic</option><option>Random</option></select></div>
-      <div class="row"><label>Scheme</label><select id="scheme"><option>Classic</option><option>Melee Only</option><option>Chaos Crates</option><option>Artillery</option></select></div>
+  <div class="panel menu">
+    <header class="m-head">
+      <canvas id="mascot" width="420" height="96"></canvas>
+      <h1 class="logo">Crater Critters</h1>
+      <p class="tag">Small. Round. Extremely explosive.</p>
+      <div class="m-you"><label for="profName">You play as</label><input type="text" id="profName" maxlength="20" placeholder="Your name" autocomplete="nickname"><button id="boardBtn" class="ghost">Leaderboard</button></div>
+      <p class="small center hidden" id="iosTip">iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
+    </header>
+    <div class="m-cols">
+      <section class="m-sec">
+        <h3>Players</h3>
+        <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
+        <div class="row"><label>Critters each</label><div class="seg" id="perTeam"></div></div>
+        <div id="teamList"></div>
+      </section>
+      <section class="m-sec">
+        <h3>World and rules</h3>
+        <div class="field"><label for="mapStyle">Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option><option value="Custom">Custom image (beta)</option></select></div>
+        <div class="field hidden" id="mapFileRow"><label>Image</label>
+          <div class="imgtools"><button type="button" id="mapPick">Choose image</button><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif" hidden>
+            <button type="button" id="mapFlipH" class="ghost" aria-label="Flip horizontally" title="Flip horizontally">⇄</button><button type="button" id="mapFlipV" class="ghost" aria-label="Flip vertically" title="Flip vertically">⇅</button><canvas id="mapThumb" width="144" height="72"></canvas></div></div>
+        <div class="field"><label for="theme">Theme</label><select id="theme"><option>Meadow</option><option>Snow</option><option>Desert</option><option>Volcanic</option><option>Random</option></select></div>
+        <div class="field"><label for="scheme">Scheme</label><select id="scheme"><option>Classic</option><option>Melee Only</option><option>Chaos Crates</option><option>Artillery</option></select></div>
+        <div class="field"><label for="turnTime">Turn time</label><select id="turnTime"><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option></select></div>
+        <div class="field"><label for="sdMinutes">Sudden death</label><select id="sdMinutes"><option value="3">after 3 min</option><option value="5">after 5 min</option><option value="10">after 10 min</option><option value="15">after 15 min</option><option value="0">never</option></select></div>
+        <p class="small" id="mapNote">The backdrop previews your map and theme.</p>
+      </section>
     </div>
-    <div class="actions">
-      <button id="helpBtn">Controls</button>
-      <button id="startBtn" class="big">Let's Rumble!</button>
-    </div>
+    <footer class="m-foot">
+      <button id="helpBtn" class="ghost">Controls</button>
+      <button id="startBtn" class="big">Let's rumble!</button>
+    </footer>
     <div class="online" id="onlineBox">
-      <h3>Play online with a friend</h3>
-      <div class="small" style="margin-bottom:6px">Up to 8 players, one per phone or computer. You play as the first team above (name &amp; colour); the host's map, scheme, critters-each and timers are used.</div>
-      <div class="row"><button id="hostBtn">Host a game</button><span class="small">or join:</span>
-        <input type="text" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters"><button id="joinBtn">Join</button></div>
+      <div class="online-text"><b>Play with friends online</b><span class="small">Up to 8 players, one per device. You play as the first team; the host's world and rules are used.</span></div>
+      <div class="online-acts"><button id="hostBtn">Host a game</button><span class="small">or join</span><input type="text" id="joinCode" maxlength="6" placeholder="CODE" autocomplete="off" autocapitalize="characters"><button id="joinBtn">Join</button></div>
     </div>
   </div>
 </div>
