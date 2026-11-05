@@ -21,6 +21,10 @@ const Terrain = {
     this.style = style; this.cavern = style === 'Cavern';
     this.themeName = THEMES[themeName] ? themeName : 'Meadow'; this.theme = THEMES[this.themeName];
     m.fill(0);
+    if (style === 'Custom') {   // beta: the player's own image, stamped above the water line
+      this.buf.fill(0); this.ceilArr = new Float32Array(W).fill(-1);
+      MapImage.stamp(this); this.decorate(rng, this.ceilArr); this.ctx.putImageData(this.img, 0, 0); this.version++; return;
+    }
     const nA = noise1(rng), nB = noise1(rng), nC = noise1(rng), n2 = noise2(rng);
     const water = CFG.WATER0;
     const top = new Float32Array(W).fill(H), bot = new Float32Array(W).fill(H), ceil = new Float32Array(W).fill(-1);

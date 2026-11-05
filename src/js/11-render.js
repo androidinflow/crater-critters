@@ -304,7 +304,7 @@ function drawEntity(x, e, t) {
       x.beginPath(); x.moveTo(-9, -9); x.lineTo(9, 9); x.moveTo(9, -9); x.lineTo(-9, 9); x.stroke(); x.fillStyle = '#ffd23f'; x.font = 'bold 11px sans-serif'; x.textAlign = 'center'; x.fillText('?', 0, 4); }
     // Crate Spy: the owning team sees what is inside
     const spyTeam = g.active ? g.active.team : null;
-    if (spyTeam && spyTeam.crateSpy && (!g.online || spyTeam.idx === Net.myTeam || Net.role === 'host' && spyTeam.idx === 0)) {
+    if (spyTeam && spyTeam.crateSpy && (!g.online || spyTeam.idx === Net.myTeam)) {
       const lab = e.type === 'trap' ? 'TRAP!' : e.type === 'health' ? '+25 HP' : (WEAP[e.content] ? WEAP[e.content].name : '?');
       x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = 'rgba(43,29,18,0.9)'; x.strokeText(lab, 0, e.chute ? 22 : -14); x.fillStyle = e.type === 'trap' ? '#ff6b6b' : '#ffe066'; x.fillText(lab, 0, e.chute ? 22 : -14);
     }

@@ -43,3 +43,16 @@ Commit the rebuilt `crater-critters.html` together with the `src/` change.
 Rooms use Supabase Realtime broadcast (host-authoritative snapshots); profiles and the
 leaderboard use two Postgres RPCs (`cc_set_name`, `cc_report_match`) and the
 `cc_leaderboard` view, all reachable with the public anon key in `src/js/14-net.js`.
+
+If the host disappears (tab closed, laptop shut) the guests hold an election after ~12 s of
+silence (or at once after a goodbye): the present player with the lowest team number
+promotes itself, rebuilds the world from its mirrored state (`rehydrate` in `14-net.js`),
+bumps the epoch so stale host packets are ignored and re-sends `init`. The old host's team
+is played by the AI until they rejoin with the same profile name.
+
+## Custom maps (beta)
+
+Map → "Custom image" lets a player pick a PNG/JPEG/WebP. Transparent pixels are air (in an
+image with no transparency, white is air); everything else is ground drawn in the image's
+own colours, fitted above the water line. The image is kept in localStorage on that device.
+Local games only for now: an online host with a custom map gets a random map instead.

@@ -49,7 +49,7 @@ function newGame(cfg) {
   cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
   banner('Critters, assemble!', '#ffd23f');
 }
-function resolveMap(m) { return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
+function resolveMap(m) { if (m === 'Custom') return !g.online && MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
 function resolveTheme(t) { return THEMES[t] ? t : pick(THEME_NAMES); }
 function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)); }
 
@@ -113,7 +113,7 @@ function startTurn() {
   g.weapon = weaponUsable(team, team.lastWeapon) ? team.lastWeapon : (WEAPONS.find(w => !w.util && weaponUsable(team, w.id)) || WEAP.skip).id;
   g.fuse = team.fuse;
   g.ai = team.ai ? new AIBrain(c) : null;
-  if (g.online && Net.role === 'host' && team.idx !== 0) {
+  if (g.online && Net.role === 'host' && team.idx !== Net.myTeam) {
     const peer = Net.peerOf(team.idx), R = Net.remotes[team.idx] || {};
     Net.seen = { fp: R.fp | 0, jp: R.jp | 0, bp: R.bp | 0 };
     if (!peer || peer.lost) { g.ai = new AIBrain(c); g.ai.standIn = true; banner(`${team.name} is away – the AI plays for them`, team.color); }

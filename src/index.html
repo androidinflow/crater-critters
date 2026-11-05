@@ -52,7 +52,8 @@
     <div class="grid2">
       <div class="row"><label>Turn time</label><select id="turnTime"><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option></select></div>
       <div class="row"><label>Sudden death</label><select id="sdMinutes"><option value="3">3 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="0">Never</option></select></div>
-      <div class="row"><label>Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option></select></div>
+      <div class="row"><label>Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option><option value="Custom">Custom image (beta)</option></select></div>
+      <div class="row hidden" id="mapFileRow"><label>Image</label><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif"></div>
       <div class="row"><label>Theme</label><select id="theme"><option>Meadow</option><option>Snow</option><option>Desert</option><option>Volcanic</option><option>Random</option></select></div>
       <div class="row"><label>Scheme</label><select id="scheme"><option>Classic</option><option>Melee Only</option><option>Chaos Crates</option><option>Artillery</option></select></div>
     </div>

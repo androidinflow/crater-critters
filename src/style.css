@@ -25,6 +25,7 @@
   button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
   button.big{font-size:24px;padding:10px 26px;background:var(--accent);color:#fff;text-shadow:2px 2px 0 var(--ink)}
   button:disabled{opacity:.35;cursor:not-allowed}
+  input[type=file]{font:inherit;font-size:13px;max-width:220px}
   select,input[type=text]{font:inherit;border:3px solid var(--ink);border-radius:10px;padding:5px 8px;background:#fff;color:var(--ink)}
   .team{display:flex;gap:8px;align-items:center;margin:6px 0;padding:6px 8px;border-radius:12px;background:rgba(0,0,0,.05)}
   .team input{flex:1;min-width:120px}

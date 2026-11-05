@@ -39,6 +39,7 @@
   button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
   button.big{font-size:24px;padding:10px 26px;background:var(--accent);color:#fff;text-shadow:2px 2px 0 var(--ink)}
   button:disabled{opacity:.35;cursor:not-allowed}
+  input[type=file]{font:inherit;font-size:13px;max-width:220px}
   select,input[type=text]{font:inherit;border:3px solid var(--ink);border-radius:10px;padding:5px 8px;background:#fff;color:var(--ink)}
   .team{display:flex;gap:8px;align-items:center;margin:6px 0;padding:6px 8px;border-radius:12px;background:rgba(0,0,0,.05)}
   .team input{flex:1;min-width:120px}
@@ -162,7 +163,8 @@
     <div class="grid2">
       <div class="row"><label>Turn time</label><select id="turnTime"><option>20</option><option>30</option><option>45</option><option>60</option><option>90</option></select></div>
       <div class="row"><label>Sudden death</label><select id="sdMinutes"><option value="3">3 min</option><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="0">Never</option></select></div>
-      <div class="row"><label>Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option></select></div>
+      <div class="row"><label>Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option><option value="Custom">Custom image (beta)</option></select></div>
+      <div class="row hidden" id="mapFileRow"><label>Image</label><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif"></div>
       <div class="row"><label>Theme</label><select id="theme"><option>Meadow</option><option>Snow</option><option>Desert</option><option>Volcanic</option><option>Random</option></select></div>
       <div class="row"><label>Scheme</label><select id="scheme"><option>Classic</option><option>Melee Only</option><option>Chaos Crates</option><option>Artillery</option></select></div>
     </div>
@@ -650,6 +652,10 @@ const Terrain = {
     this.style = style; this.cavern = style === 'Cavern';
     this.themeName = THEMES[themeName] ? themeName : 'Meadow'; this.theme = THEMES[this.themeName];
     m.fill(0);
+    if (style === 'Custom') {   // beta: the player's own image, stamped above the water line
+      this.buf.fill(0); this.ceilArr = new Float32Array(W).fill(-1);
+      MapImage.stamp(this); this.decorate(rng, this.ceilArr); this.ctx.putImageData(this.img, 0, 0); this.version++; return;
+    }
     const nA = noise1(rng), nB = noise1(rng), nC = noise1(rng), n2 = noise2(rng);
     const water = CFG.WATER0;
     const top = new Float32Array(W).fill(H), bot = new Float32Array(W).fill(H), ceil = new Float32Array(W).fill(-1);
@@ -3423,7 +3429,7 @@ function drawEntity(x, e, t) {
       x.beginPath(); x.moveTo(-9, -9); x.lineTo(9, 9); x.moveTo(9, -9); x.lineTo(-9, 9); x.stroke(); x.fillStyle = '#ffd23f'; x.font = 'bold 11px sans-serif'; x.textAlign = 'center'; x.fillText('?', 0, 4); }
     // Crate Spy: the owning team sees what is inside
     const spyTeam = g.active ? g.active.team : null;
-    if (spyTeam && spyTeam.crateSpy && (!g.online || spyTeam.idx === Net.myTeam || Net.role === 'host' && spyTeam.idx === 0)) {
+    if (spyTeam && spyTeam.crateSpy && (!g.online || spyTeam.idx === Net.myTeam)) {
       const lab = e.type === 'trap' ? 'TRAP!' : e.type === 'health' ? '+25 HP' : (WEAP[e.content] ? WEAP[e.content].name : '?');
       x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = 'rgba(43,29,18,0.9)'; x.strokeText(lab, 0, e.chute ? 22 : -14); x.fillStyle = e.type === 'trap' ? '#ff6b6b' : '#ffe066'; x.fillText(lab, 0, e.chute ? 22 : -14);
     }
@@ -3764,6 +3770,42 @@ const DEFAULT_SETTINGS = {
           { name: 'Needle Knights', color: 6, ai: true }, { name: 'Fuzz Force', color: 7, ai: true }],
 };
 const SETTINGS_KEY = 'craterCritters.settings.v1';
+// Custom image maps (beta): a picture from the player, fitted above the water line. Transparent
+// pixels are air (in a picture with no transparency at all, white is air); everything else is
+// ground painted with the picture's own colours. Kept in localStorage, local games only for now.
+const MapImage = {
+  KEY: 'cc_custom_map', img: null,
+  ready() { return !!(this.img && this.img.complete && this.img.naturalWidth > 0); },
+  init(then) { let d = null; try { d = localStorage.getItem(this.KEY); } catch (e) { } if (d) this.setSrc(d, then); },
+  setSrc(src, then) { const im = new Image(); im.onload = () => { this.img = im; if (then) then(true); }; im.onerror = () => { if (then) then(false); }; im.src = src; },
+  load(file) {
+    const rd = new FileReader();
+    rd.onload = () => this.setSrc(rd.result, ok => {
+      if (!ok) { $('mapNote').textContent = 'Could not read that image.'; return; }
+      const im = this.img, k = Math.min(1, 1200 / im.naturalWidth, 530 / im.naturalHeight), cv = document.createElement('canvas');   // half the playfield is plenty
+      cv.width = Math.max(1, Math.round(im.naturalWidth * k)); cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+      cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+      const url = cv.toDataURL('image/png'); let kept = true;
+      try { localStorage.setItem(this.KEY, url); } catch (e) { kept = false; }
+      this.setSrc(url, () => { settings.map = 'Custom'; saveSettings(); UI.buildMenu(); startBackdrop(); $('mapNote').textContent = kept ? 'Custom map loaded. Transparent or white pixels are air.' : 'Custom map loaded (too big to remember between visits).'; });
+    });
+    rd.readAsDataURL(file);
+  },
+  stamp(T) {
+    const im = this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
+    const k = Math.min(maxW / im.naturalWidth, maxH / im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
+    const x0 = Math.round((W - w) / 2), y0 = Math.round(CFG.WATER0 - 70 - h);
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d'); x.drawImage(im, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data; let clear = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] <= 127) clear++;
+    const whiteIsAir = clear < d.length / 4 * 0.005;
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      const i = (yy * w + xx) * 4;
+      if (d[i + 3] <= 127 || (whiteIsAir && d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235)) continue;
+      const j = (y0 + yy) * W + (x0 + xx); T.mask[j] = 1; T.buf[j] = (255 << 24) | (d[i + 2] << 16) | (d[i + 1] << 8) | d[i];
+    }
+  },
+};
 function loadSettings() {
   const d = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
   try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) { Object.assign(d, s); d.teams = DEFAULT_SETTINGS.teams.map((t, i) => Object.assign({}, t, (s.teams || [])[i])); } } catch (e) { }
@@ -3797,9 +3839,12 @@ const UI = {
         b.onclick = () => { t.ai = v; saveSettings(); this.buildMenu(); }; ai.appendChild(b); }
       row.append(sw, nm, ai); list.appendChild(row);
     }
-    const bindSel = (id, key, num, after) => { const el = $(id); el.value = String(settings[key]); el.onchange = () => { settings[key] = num ? +el.value : el.value; saveSettings(); if (after) after(); }; };
+    const bindSel = (id, key, num, after) => { const el = $(id); el.value = String(settings[key]); if (el.value !== String(settings[key])) { settings[key] = DEFAULT_SETTINGS[key]; el.value = String(settings[key]); } el.onchange = () => { settings[key] = num ? +el.value : el.value; saveSettings(); if (after) after(); }; };
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('scheme', 'scheme');
-    bindSel('mapStyle', 'map', false, startBackdrop); bindSel('theme', 'theme', false, startBackdrop);
+    bindSel('mapStyle', 'map', false, () => { this.buildMenu(); startBackdrop(); }); bindSel('theme', 'theme', false, startBackdrop);
+    $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
+    if (settings.map === 'Custom') $('mapNote').textContent = MapImage.ready() ? 'Custom map: transparent or white pixels are air. Local games only (beta).' : 'Pick an image below. Transparent or white pixels are air.';
+    else $('mapNote').textContent = 'The backdrop previews your map & theme.';
   },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
   hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
@@ -3871,6 +3916,7 @@ const UI = {
 };
 $('startBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); UI.hideAll(); newGame(); };
 $('helpBtn').onclick = () => UI.toggleHelp();
+$('mapFile').onchange = e => { const f = e.target.files && e.target.files[0]; if (f) MapImage.load(f); e.target.value = ''; };
 $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
 $('pauseHelpBtn').onclick = () => UI.toggleHelp();
@@ -3951,7 +3997,7 @@ function newGame(cfg) {
   cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
   banner('Critters, assemble!', '#ffd23f');
 }
-function resolveMap(m) { return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
+function resolveMap(m) { if (m === 'Custom') return !g.online && MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
 function resolveTheme(t) { return THEMES[t] ? t : pick(THEME_NAMES); }
 function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)); }
 
@@ -4015,7 +4061,7 @@ function startTurn() {
   g.weapon = weaponUsable(team, team.lastWeapon) ? team.lastWeapon : (WEAPONS.find(w => !w.util && weaponUsable(team, w.id)) || WEAP.skip).id;
   g.fuse = team.fuse;
   g.ai = team.ai ? new AIBrain(c) : null;
-  if (g.online && Net.role === 'host' && team.idx !== 0) {
+  if (g.online && Net.role === 'host' && team.idx !== Net.myTeam) {
     const peer = Net.peerOf(team.idx), R = Net.remotes[team.idx] || {};
     Net.seen = { fp: R.fp | 0, jp: R.jp | 0, bp: R.bp | 0 };
     if (!peer || peer.lost) { g.ai = new AIBrain(c); g.ai.standIn = true; banner(`${team.name} is away – the AI plays for them`, team.color); }
@@ -4247,6 +4293,12 @@ function frame(now) {
 //     sounds, floating text, banners), recorded by wrapping those functions on the host.
 // Terrain edits are also kept in a log so a (re)joining guest can rebuild the map from the
 // seed + log instead of downloading a 2.9 MB bitmap.
+// Host migration: guests overhear each other's packets, so when the host goes quiet (12 s) or
+// says goodbye, the present guest with the lowest team number promotes itself: it turns its
+// mirrored world into a real simulation (rehydrate), bumps the epoch so stale host packets are
+// ignored, announces the takeover and re-sends `init` to everyone. A host that was merely
+// asleep demotes itself to a guest when it hears the takeover. The old host's team is played
+// by the AI until its owner rejoins (by name, like any lost player).
 const SUPA = { url: 'https://sup.charsi.cc', key: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc5MzIzMjY2MCwiZXhwIjo0OTQ4OTA2MjYwLCJyb2xlIjoiYW5vbiJ9.QuWZFrs3ejJi2MpjmMo-QxQRijTSLPdw6R5qoAxZ3NM' };
 const nr = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v;
 function netCopy(v) {
@@ -4257,7 +4309,7 @@ function netCopy(v) {
 const Net = {
   role: null, ws: null, code: '', topic: '', ref: 1, joined: false, started: false, accepted: false,
   pid: '', myTeam: 0, peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, events: [], log: [], mute: 0,
-  fp: 0, jp: 0, bp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, snapAt: 0, helloT: 0, roster: [],
+  fp: 0, jp: 0, bp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, lostAt: 0, electT: 0, snapAt: 0, helloT: 0, roster: [], seenPeers: {}, epoch: 0,
   // ---- transport ----
   open() {
     const ws = this.ws = new WebSocket(`${SUPA.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SUPA.key}&vsn=1.0.0`);
@@ -4281,7 +4333,7 @@ const Net = {
   begin(code, role) {
     this.leave();
     Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, accepted: false, hostLost: false, lastHost: performance.now(),
-      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [],
+      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [], seenPeers: {}, epoch: 0, lostAt: 0, electT: 0,
       pid: this.pid || this.storedPid() });
     // heartbeat on a timer (not the animation loop) so a backgrounded phone tab still counts as present
     this.hbTimer = setInterval(() => { if (this.joined) this.send(this.role === 'host' ? { t: 'hb', host: 1 } : { t: 'hb', pid: this.pid, team: this.myTeam }); }, 2000);
@@ -4318,7 +4370,7 @@ const Net = {
     if (this.role === 'host') UI.netStatus(this.started ? 'Reconnected.' : 'Waiting for friends to join…');
     else { this.accepted = false; UI.netStatus(this.started ? 'Reconnected – syncing…' : 'Looking for the host…'); this.hello(); }
   },
-  hello() { const t = settings.teams[0]; this.send({ t: 'hello', pid: this.pid, name: Profile.name().slice(0, 18), color: t.color | 0 }); this.helloT = 0; },
+  hello(name) { const t = settings.teams[0]; this.send({ t: 'hello', pid: this.pid, name: (name || Profile.name()).slice(0, 18), color: t.color | 0 }); this.helloT = 0; },
   renderRoster() {
     const ul = $('roster'); if (!ul) return; ul.innerHTML = '';
     const list = this.role === 'host' ? [{ name: Profile.name(), color: settings.teams[0].color, host: true }, ...this.peerList()] : this.roster;
@@ -4334,7 +4386,7 @@ const Net = {
     this.started = true;
     const me = settings.teams[0], used = new Set(), teams = [];
     const takeColor = c => { c = c | 0; for (let k = 0; k < TEAM_COLORS.length && used.has(c); k++) c = (c + 1) % TEAM_COLORS.length; used.add(c); return c; };
-    teams.push({ name: me.name, color: takeColor(me.color), ai: false });
+    teams.push({ name: Profile.name().slice(0, 18), color: takeColor(me.color), ai: false });   // the profile name: that is what a rejoin (and a takeover) matches on
     for (const p of this.peerList()) teams.push({ name: p.name, color: takeColor(p.color), ai: false });
     UI.hideAll();
     newGame({ teams });
@@ -4342,7 +4394,7 @@ const Net = {
   },
   sendInit(to) {
     const slots = {}; for (const k in this.peers) slots[k] = this.peers[k].team;
-    this.send({ t: 'init', host: 1, to, slots, seed: g.seed, map: g.mapStyle, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: settings.turnTime, sdMinutes: settings.sdMinutes,
+    this.send({ t: 'init', host: 1, to, slots, ep: this.epoch, seed: g.seed, map: g.mapStyle, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: g.settings.turnTime, sdMinutes: g.settings.sdMinutes,
       teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
   },
   onMsg(m) {
@@ -4368,16 +4420,21 @@ const Net = {
         case 'rm': if (peer && g.state === 'gameover') this.startGame(); break;
         case 'bye': if (peer) { peer.lost = true; banner(`${peer.name} left the game`, '#8ecae6'); this.broadcastRoster(); } break;
         case 'chat': if (peer) Chat.add(peer.name, TEAM_COLORS[peer.color], String(m.x || '').slice(0, 120), false); break;
+        case 'takeover': if (m.pid !== this.pid && (m.ep | 0) > this.epoch) this.demote(m); break;
       }
     } else {
+      // overhear the other guests so we can hold an election if the host disappears
+      if (m.pid && m.pid !== this.pid && !m.host) { if (m.t === 'bye') delete this.seenPeers[m.pid]; else if (m.team !== undefined) this.seenPeers[m.pid] = { team: m.team | 0, last: now }; }
+      if (m.ep !== undefined && (m.ep | 0) < this.epoch) return;   // a packet from a host that has since been replaced
       if (m.host) { this.lastHost = now; if (this.hostLost) { this.hostLost = false; UI.netStatus('Host is back!'); } }
       switch (m.t) {
-        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.setupGuest(m); break;
-        case 'roster': this.accepted = true; this.roster = m.list || []; this.renderRoster(); if (!this.started) UI.netStatus(`Joined! ${this.roster.length} in the room – waiting for the host to start…`); break;
+        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.epoch = m.ep | 0; this.setupGuest(m); break;
+        case 'takeover': if (m.pid !== this.pid) { this.epoch = m.ep | 0; this.hostLost = false; this.lastHost = now; this.accepted = false; UI.netStatus(`${g.teams[m.team] ? g.teams[m.team].name : 'A friend'} is hosting now`); } break;
+        case 'roster': this.accepted = true; this.roster = m.list || []; this.renderRoster(); if (!this.started && !m.started) UI.netStatus(`Joined! ${this.roster.length} in the room – waiting for the host to start…`); break;
         case 'full': if (m.to === this.pid) { this.accepted = true; UI.netStatus(m.playing ? `That game is already in progress. If you were in it, rejoin with the same name you used (${Profile.name()}).` : 'That room is full (8 players).'); } break;
         case 's': if (this.started) { applyEvents(m.ev); applySnap(m); } break;
         case 'chat': if (m.host || m.pid !== this.pid) Chat.add(String(m.n || 'Friend').slice(0, 18), m.c, String(m.x || '').slice(0, 120), false); break;
-        case 'bye': if (m.host) { this.hostLost = true; UI.netStatus('The host left the game.'); } break;
+        case 'bye': if (m.host) { this.hostLost = true; this.lostAt = now - 10000; UI.netStatus('The host left – choosing a new host…'); } break;
       }
     }
   },
@@ -4399,10 +4456,35 @@ const Net = {
       for (const k in this.peers) { const p = this.peers[k]; if (!p.lost && now - p.last > 12000) { p.lost = true; banner(`${p.name} seems to have disconnected…`, '#8ecae6'); this.broadcastRoster(); } }
       if (this.started && g.state !== 'menu' && ((this.snapT += real) > 1 / 15 || this.events.length > 250)) { this.snapT = 0; const s = this.snap(); s.host = 1; s.ev = this.events; this.events = []; this.send(s); }
     } else {
-      if (this.started && !this.hostLost && now - this.lastHost > 12000) { this.hostLost = true; UI.netStatus('Lost contact with the host…'); }
+      if (this.started && !this.hostLost && now - this.lastHost > 12000) { this.hostLost = true; this.lostAt = now; UI.netStatus('Lost contact with the host…'); }
+      if (this.started && this.hostLost && now - this.lostAt > 1500 && (this.electT += real) > 2) { this.electT = 0; this.elect(now); }
       if (!this.accepted) { if ((this.helloT += real) > 1.5) this.hello(); }
       else if (this.started) this.guestInput(real);
     }
+  },
+  // ---- host migration ----
+  elect(now) {   // the present player with the lowest team number becomes host; everyone runs the same rule
+    let best = this.myTeam;
+    for (const k in this.seenPeers) { const p = this.seenPeers[k]; if (now - p.last < 15000 && p.team < best) best = p.team; }
+    if (best === this.myTeam) this.takeover(now);
+  },
+  takeover(now) {
+    const oldEpoch = this.epoch; this.epoch = oldEpoch + 1;
+    Object.assign(this, { role: 'host', hostLost: false, accepted: true, started: true, peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, events: [], snapT: 0 });
+    for (const k in this.seenPeers) { const p = this.seenPeers[k]; if (p.team === this.myTeam || !g.teams[p.team]) continue;
+      this.peers[k] = { pid: k, team: p.team, name: g.teams[p.team].name, color: Math.max(0, TEAM_COLORS.indexOf(g.teams[p.team].color)), last: p.last, lost: now - p.last > 12000 }; }
+    for (const t of g.teams) if (t.idx !== this.myTeam && !this.peerOf(t.idx))   // the old host and anyone else we never heard from: a lost slot they can rejoin by name
+      this.peers['lost' + t.idx] = { pid: 'lost' + t.idx, team: t.idx, name: t.name, color: Math.max(0, TEAM_COLORS.indexOf(t.color)), last: 0, lost: true };
+    rehydrate();
+    this.send({ t: 'takeover', host: 1, pid: this.pid, team: this.myTeam, ep: this.epoch });
+    this.sendInit();
+    banner('The host is gone – you are hosting now!', '#8ecae6'); UI.netStatus('You are the host now.'); Sfx.pickup();
+  },
+  demote(m) {   // we were host, but the room moved on without us (we were asleep): fall in line as a guest
+    const myName = g.teams[this.myTeam] ? g.teams[this.myTeam].name : Profile.name();
+    Object.assign(this, { role: 'guest', epoch: m.ep | 0, accepted: false, started: true, hostLost: false, lastHost: performance.now(), peers: {}, remotes: {}, seenPeers: {} });
+    g.online = true; UI.netStatus(`${g.teams[m.team] ? g.teams[m.team].name : 'A friend'} took over hosting while you were away`);
+    this.hello(myName);
   },
   guestInput(real) {
     const mine = myTurn() && g.controlling, d = Input.down, p = Input.pressed, blocked = UI.blocking() || !mine;
@@ -4421,7 +4503,7 @@ const Net = {
   // ---- snapshots ----
   snap() {
     const t = Net.started ? camTarget() : null;
-    return { t: 's', st: g.state, tt: nr(g.turnT), w: nr(g.wind), wp: g.weapon, fu: g.fuse, tg: g.target ? [nr(g.target.x), nr(g.target.y)] : 0,
+    return { t: 's', ep: this.epoch, st: g.state, tt: nr(g.turnT), w: nr(g.wind), wp: g.weapon, fu: g.fuse, tg: g.target ? [nr(g.target.x), nr(g.target.y)] : 0,
       ch: g.charging, pw: nr(g.power), rt: g.retreat, fi: g.fired, lw: g.lockWeapon, ct: g.controlling, ga: nr(g.girderAng), sl: g.shotsLeft, rb: g.robot ? (g.robot.hint || 1) : 0, ls: !!g.laser, cs: g.teams.map(t => !!t.crateSpy),
       a: g.active ? g.active.id : 0, wy: nr(g.waterY), sd: g.sd, tm: nr(g.time), ts: nr(g.turnStartT), sm: nr(g.slowmo), sh: nr(g.shake), win: g.winner ? g.winner.idx : -1,
       cf: t ? [nr(t.x), nr(t.y)] : 0, am: g.teams.map(t => t.ammo), dm: g.teams.map(t => [Math.round(t.dmg), t.kills]), us: g.teams.map(t => t.used),
@@ -4431,10 +4513,11 @@ const Net = {
   },
   setupGuest(m) {
     UI.hideAll(); this.started = true; this.hostLost = false; this.myTeam = m.slots[this.pid];
-    g = makeState(); g.online = true; g.seed = m.seed; g.schemeName = m.scheme || ''; g.perTeam = m.perTeam || 4; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
+    g = makeState(); g.online = true; g.seed = m.seed; g.schemeName = m.scheme || ''; g.scheme = SCHEMES[g.schemeName] || SCHEMES.Classic; g.perTeam = m.perTeam || 4; g.settings = { turnTime: m.turnTime, sdMinutes: m.sdMinutes };
+    g.mapStyle = m.map; g.theme = m.theme;
     Terrain.generate(m.map, m.seed, m.theme); bg = makeBackground(m.seed, Terrain.cavern);
-    applyEvents(m.log);
-    g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
+    this.log = []; applyEvents(m.log);   // the guest keeps the terrain log too, in case it has to host one day
+    g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, cIdx: -1, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
     applySnap(m.snap);
     cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
@@ -4478,7 +4561,42 @@ for (const k of Object.keys(Sfx)) {
 }
 function applyEvents(evs) {
   if (!evs) return;
-  for (const e of evs) { const fn = NET_FN[e[0]]; if (fn) try { fn(...e.slice(1)); } catch (err) { } }
+  for (const e of evs) { const fn = NET_FN[e[0]]; if (fn) try { fn(...e.slice(1)); } catch (err) { } if (Net.role === 'guest' && (e[0] === 'c' || e[0] === 'g')) Net.log.push(e); }
+}
+// Host migration: turn this guest's mirrored world (bare objects with only the synced fields) into
+// real, simulating entities. Things that only live for one turn (strikes, clouds, beams, ropes,
+// balloons, the flying squirrel…) are dropped and the turn is wound up, so play resumes cleanly.
+function rehydrate() {
+  const ents = [];
+  for (const e of g.ents) {
+    if (e.dead || e instanceof Critter) continue;
+    const x = e._nx ?? e.x, y = e._ny ?? e.y; let n = null;
+    if (e instanceof Proj) { if (!PROJ[e.type]) continue; n = new Proj(e.type, x, y, e.vx, e.vy, { fuse: e.fuseT }); Object.assign(n, { spin: e.spin || 0, armT: e.armT, trigT: e.trigT, stuck: !!e.stuck }); if (n.remote) n.maxAge = 2; }
+    else if (e instanceof Mine) { n = new Mine(x, y, false, !!e.big); Object.assign(n, { trigT: e.trigT, spent: !!e.spent, blink: e.blink || 0, armT: e.armT || 0 }); }
+    else if (e instanceof Barrel) { n = new Barrel(x, y); n.fuseT = e.fuseT; }
+    else if (e instanceof Crate) { n = new Crate(x, y, e.type || 'weapon', WEAP[e.content] ? e.content : pick(g.scheme.pool)); n.chute = !!e.chute; n.sway = e.sway || 0; n.important = n.chute; }
+    else if (e instanceof Grave) n = new Grave(x, y, e.col);
+    else if (e instanceof GasPuff) { n = new GasPuff(x, y, e.vx, e.vy); n.life = e.life; }
+    else if (e instanceof Robot) { n = new Robot(x, y, e.dir || 1, ANIMALS[e.kind] ? e.kind : 'robot'); n.t = e.t; n.legPh = e.legPh || 0; }
+    else if (e instanceof Anvil) { n = new Anvil(x, e.kind || 'anvil'); n.y = y; }
+    else if (e instanceof Sentry) { n = new Sentry(x, y, g.teams[e.ti] || g.teams[0]); n.shots = e.shots; n.hp = e.hp; n.ang = e.ang; }
+    else if (e instanceof Pump) { n = new Pump(x, y); n.t = e.t; }
+    else if (e instanceof Volcano) { n = new Volcano(x, y); n.t = e.t; n.emitted = Math.min(30, Math.floor(e.t / 3 * 30)); }
+    if (n) { n.id = e.id; n.vx = e.vx || 0; n.vy = e.vy || 0; ents.push(n); }
+  }
+  let maxId = 0;
+  for (const c of g.critters) {
+    if (c._nx !== undefined) { c.x = c._nx; c.y = c._ny; }
+    c.rope = null; c.balloon = null; c.tumble = false; c.spin = 0; c.spinV = 0; c.flipV = 0; c.jumped = false;
+    if (c.alive && c.mode !== 'ground' && c.mode !== 'air') { c.mode = 'air'; c.fallDmg = false; c.vx = c.vy = 0; }
+    if (c.alive) { c.dead = false; ents.push(c); } else c.dead = true;
+    maxId = Math.max(maxId, c.id | 0);
+  }
+  for (const e of ents) maxId = Math.max(maxId, e.id | 0);
+  g.ents = ents; g.nextId = maxId + 1; g.robot = null; g.focus = null; g.ai = null; g.minesLive = true;
+  g.waterTarget = g.waterY; g.teamIdx = g.active ? g.active.team.idx : -1; g.netFocus = null;
+  if (g.state !== 'gameover') Object.assign(g, { state: 'resolving', controlling: false, charging: false, phase: 'settle', phaseT: 0, quietT: 0, resolveT: 0, waterDone: false, crateDone: false, forced: false });
+  if (UI.pickerOpen) UI.togglePicker();
 }
 // Guest: merge a snapshot into local objects (reusing them by id so drawing stays smooth)
 function applySnap(s) {
@@ -4696,6 +4814,7 @@ bindPointer(canvas);
 bindTouchButtons();
 Chat.init(); Full.init();
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) UI.showTouch(true);
+MapImage.init(() => { if (settings.map === 'Custom' && g.state === 'menu') { UI.buildMenu(); startBackdrop(); } });
 UI.showMenu();
 { const room = new URLSearchParams(location.search).get('room'); if (room) { $('joinCode').value = room.toUpperCase().slice(0, 6); $('onlineBox').classList.add('invited'); } }
 requestAnimationFrame(frame);

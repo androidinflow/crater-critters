@@ -155,6 +155,42 @@ const DEFAULT_SETTINGS = {
           { name: 'Needle Knights', color: 6, ai: true }, { name: 'Fuzz Force', color: 7, ai: true }],
 };
 const SETTINGS_KEY = 'craterCritters.settings.v1';
+// Custom image maps (beta): a picture from the player, fitted above the water line. Transparent
+// pixels are air (in a picture with no transparency at all, white is air); everything else is
+// ground painted with the picture's own colours. Kept in localStorage, local games only for now.
+const MapImage = {
+  KEY: 'cc_custom_map', img: null,
+  ready() { return !!(this.img && this.img.complete && this.img.naturalWidth > 0); },
+  init(then) { let d = null; try { d = localStorage.getItem(this.KEY); } catch (e) { } if (d) this.setSrc(d, then); },
+  setSrc(src, then) { const im = new Image(); im.onload = () => { this.img = im; if (then) then(true); }; im.onerror = () => { if (then) then(false); }; im.src = src; },
+  load(file) {
+    const rd = new FileReader();
+    rd.onload = () => this.setSrc(rd.result, ok => {
+      if (!ok) { $('mapNote').textContent = 'Could not read that image.'; return; }
+      const im = this.img, k = Math.min(1, 1200 / im.naturalWidth, 530 / im.naturalHeight), cv = document.createElement('canvas');   // half the playfield is plenty
+      cv.width = Math.max(1, Math.round(im.naturalWidth * k)); cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+      cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+      const url = cv.toDataURL('image/png'); let kept = true;
+      try { localStorage.setItem(this.KEY, url); } catch (e) { kept = false; }
+      this.setSrc(url, () => { settings.map = 'Custom'; saveSettings(); UI.buildMenu(); startBackdrop(); $('mapNote').textContent = kept ? 'Custom map loaded. Transparent or white pixels are air.' : 'Custom map loaded (too big to remember between visits).'; });
+    });
+    rd.readAsDataURL(file);
+  },
+  stamp(T) {
+    const im = this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
+    const k = Math.min(maxW / im.naturalWidth, maxH / im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
+    const x0 = Math.round((W - w) / 2), y0 = Math.round(CFG.WATER0 - 70 - h);
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d'); x.drawImage(im, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data; let clear = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] <= 127) clear++;
+    const whiteIsAir = clear < d.length / 4 * 0.005;
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+      const i = (yy * w + xx) * 4;
+      if (d[i + 3] <= 127 || (whiteIsAir && d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235)) continue;
+      const j = (y0 + yy) * W + (x0 + xx); T.mask[j] = 1; T.buf[j] = (255 << 24) | (d[i + 2] << 16) | (d[i + 1] << 8) | d[i];
+    }
+  },
+};
 function loadSettings() {
   const d = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
   try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) { Object.assign(d, s); d.teams = DEFAULT_SETTINGS.teams.map((t, i) => Object.assign({}, t, (s.teams || [])[i])); } } catch (e) { }
@@ -188,9 +224,12 @@ const UI = {
         b.onclick = () => { t.ai = v; saveSettings(); this.buildMenu(); }; ai.appendChild(b); }
       row.append(sw, nm, ai); list.appendChild(row);
     }
-    const bindSel = (id, key, num, after) => { const el = $(id); el.value = String(settings[key]); el.onchange = () => { settings[key] = num ? +el.value : el.value; saveSettings(); if (after) after(); }; };
+    const bindSel = (id, key, num, after) => { const el = $(id); el.value = String(settings[key]); if (el.value !== String(settings[key])) { settings[key] = DEFAULT_SETTINGS[key]; el.value = String(settings[key]); } el.onchange = () => { settings[key] = num ? +el.value : el.value; saveSettings(); if (after) after(); }; };
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('scheme', 'scheme');
-    bindSel('mapStyle', 'map', false, startBackdrop); bindSel('theme', 'theme', false, startBackdrop);
+    bindSel('mapStyle', 'map', false, () => { this.buildMenu(); startBackdrop(); }); bindSel('theme', 'theme', false, startBackdrop);
+    $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
+    if (settings.map === 'Custom') $('mapNote').textContent = MapImage.ready() ? 'Custom map: transparent or white pixels are air. Local games only (beta).' : 'Pick an image below. Transparent or white pixels are air.';
+    else $('mapNote').textContent = 'The backdrop previews your map & theme.';
   },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
   hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board'].forEach(id => $(id).classList.add('hidden')); this.pickerOpen = this.paused = this.helpOpen = false; },
@@ -262,6 +301,7 @@ const UI = {
 };
 $('startBtn').onclick = () => { Sfx.init(); Full.auto(); saveSettings(); UI.hideAll(); newGame(); };
 $('helpBtn').onclick = () => UI.toggleHelp();
+$('mapFile').onchange = e => { const f = e.target.files && e.target.files[0]; if (f) MapImage.load(f); e.target.value = ''; };
 $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
 $('pauseHelpBtn').onclick = () => UI.toggleHelp();
