@@ -146,7 +146,7 @@ function fireInstant(c, id) {
     case 'suicide':
       explode(c.x, c.y, 60, 50, { ignore: c });
       for (let i = 0; i < 10; i++) { const a = rand(0, 6.28), sp = rand(20, 90); spawn(new GasPuff(c.x + Math.cos(a) * 6, c.y - 6 + Math.sin(a) * 6, Math.cos(a) * sp, Math.sin(a) * sp - 30)); }
-      hurt(c, 999); c.vx = c.vy = 0; useAmmo(id); afterFire(); c.speak(pick(['It was an honour.', 'Boom goes the hedgehog!'])); break;
+      hurt(c, 999); c.vx = c.vy = 0; useAmmo(id); afterFire(); c.speak(pick(['It was an honour.', 'Boom goes the penguin!'])); break;
     case 'nuke':
       g.waterTarget = Math.max(400, g.waterTarget - 45);
       for (const o of g.critters) if (o.alive) poisonCritter(o, 3);
@@ -195,7 +195,7 @@ function fireInstant(c, id) {
     case 'crateshower': useAmmo(id); dropCrates(4); Sfx.pickup(); c.speak('Presents!'); break;
     case 'hibernate':
       if (c.mode !== 'ground') return;
-      c.frozen = 1; c.land(0); useAmmo(id); g.fired = true; addText(c.x, c.y - 30, 'HIBERNATING', '#9ad7ff', 18); Sfx.tone(900, 0.3, 'sine', 0.1, 300);
+      c.frozen = 1; c.land(0); useAmmo(id); g.fired = true; addText(c.x, c.y - 30, 'HUDDLED UP', '#9ad7ff', 18); Sfx.tone(900, 0.3, 'sine', 0.1, 300);
       for (let i = 0; i < 14; i++) P({ kind: 'spark', x: c.x, y: c.y, vx: rand(-100, 100), vy: rand(-100, 100), g: 0, drag: 0.9, size: 2, life: 0.6, col: '#fff' });
       c.speak(pick(['Zzz… brrr.', 'Wake me when it\'s over.'])); endControl(); break;
     case 'skip':
@@ -656,10 +656,11 @@ function drawIcon(x, id, s) {
       x.beginPath(); x.moveTo(0, -20); x.lineTo(0, 6); x.lineWidth = 4; x.strokeStyle = '#2b1d12'; x.stroke(); x.lineWidth = 2.5;
       x.strokeStyle = '#9aa3ad'; x.lineWidth = 2; x.beginPath(); for (let i = 0; i < 5; i++) { x.moveTo(-6, 4 + i * 3); x.lineTo(6, 5 + i * 3); } x.stroke();
       x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; rr(x, -12, -4, 24, 5, 2); fs(x, '#e63946'); rr(x, -8, -22, 16, 4, 2); fs(x, '#e63946'); circ(x, 0, 20, 3); fs(x, '#2b1d12'); break;
-    case 'bowling':
-      circ(x, 0, 0, 13); fs(x, '#6b4427');
-      x.fillStyle = '#3b2414'; for (let i = 0; i < 10; i++) { const a = i * 0.628; x.beginPath(); x.moveTo(Math.cos(a - 0.2) * 12, Math.sin(a - 0.2) * 12); x.lineTo(Math.cos(a) * 19, Math.sin(a) * 19); x.lineTo(Math.cos(a + 0.2) * 12, Math.sin(a + 0.2) * 12); x.fill(); }
-      x.fillStyle = '#fff'; circ(x, -4, -3, 3); x.fill(); circ(x, 4, -3, 3); x.fill(); x.fillStyle = '#111'; circ(x, -3, -3, 1.4); x.fill(); circ(x, 5, -3, 1.4); x.fill(); break;
+    case 'bowling':   // a penguin curled into a bowling ball
+      circ(x, 0, 0, 14); fs(x, '#262a3a'); x.fillStyle = '#f6f2e8'; x.beginPath(); x.ellipse(2, 3, 8, 9, 0, 0, 7); x.fill();
+      x.beginPath(); x.ellipse(-8, 5, 3, 6, 0.6, 0, 7); fs(x, '#262a3a');
+      x.fillStyle = '#fff'; circ(x, -2, -5, 3.2); x.fill(); circ(x, 5, -4, 3); x.fill(); x.fillStyle = '#111'; circ(x, -1, -5, 1.5); x.fill(); circ(x, 6, -4, 1.4); x.fill();
+      x.beginPath(); x.moveTo(8, -1); x.lineTo(15, 1); x.lineTo(8, 3); x.closePath(); fs(x, '#ff9f1c'); break;
     case 'boomerang':
       x.lineWidth = 7; x.strokeStyle = '#2b1d12'; x.beginPath(); x.moveTo(-14, 10); x.quadraticCurveTo(-2, -14, 14, 8); x.stroke();
       x.lineWidth = 3.5; x.strokeStyle = '#a0703f'; x.stroke(); x.lineWidth = 2.5; x.strokeStyle = '#2b1d12';

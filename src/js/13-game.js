@@ -282,7 +282,7 @@ function tick(dt) {
       if (g.phaseT > 1.5 && !worldBusy()) { g.minesLive = true; g.time = 0; startTurn(); }
     } else if (g.state === 'resolving') updateResolving(dt);
     else if (g.state === 'gameover') {
-      for (const c of g.critters) if (c.alive && c.team === g.winner && c.mode === 'ground' && Math.random() < dt * 0.8) { c.doJump(Math.random() < 0.3); if (Math.random() < 0.3) c.speak(pick(['Woohoo!', 'We did it!', 'Spiky power!'])); }
+      for (const c of g.critters) if (c.alive && c.team === g.winner && c.mode === 'ground' && Math.random() < dt * 0.8) { c.doJump(Math.random() < 0.3); if (Math.random() < 0.3) c.speak(pick(['Woohoo!', 'We did it!', 'Waddle power!'])); }
       if (Math.random() < dt * 6) { const x = cam.x + rand(-400, 400), y = cam.y - 300; for (let i = 0; i < 6; i++) P({ kind: 'spark', x, y, vx: rand(-200, 200), vy: rand(-100, 200), g: 200, drag: 0.98, size: 3, life: 1.5, col: pick(TEAM_COLORS) }); }
       if (g.overT > 0 && (g.overT -= dt) <= 0) UI.showOver();
     }

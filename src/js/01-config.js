@@ -23,11 +23,11 @@ const NAMES = ['Pip','Bramble','Nibs','Spud','Tuft','Prickle','Mochi','Waffles',
   'Tater','Fizz','Pebble','Doodle','Gizmo','Puddle','Crumb','Bonk','Wobbles','Zest','Toffee','Squeak','Pogo','Nugget',
   'Pickle','Munch','Dizzy','Scoot','Fudge','Twig','Blip','Snug','Rascal','Pudding','Ziggy','Mellow','Scamp','Nibble'];
 const QUIPS = {
-  hit: ['Ow, my quills!','Not the face!','Rude!','Right in the snoot!','Totally meant that.','My spines!','Who ordered THAT?',
+  hit: ['Ow, my flippers!','Not the face!','Rude!','Right in the snoot!','Totally meant that.','My feathers!','Who ordered THAT?',
     'Ouchie wawa!','I\'m too round for this!','Hey! I just got fluffed!','That tickled… NOT!','Mommy?!','Boing?!'],
   lose: ['Uhh… which button?','Zzz…','I forgot my snack.','Wait, my turn?','Bloop.','Thinking… still thinking…'],
-  turn: ['Let\'s roll!','Spike time!','Hold my acorn.','Here goes nothing!','Tactical waddle!','Watch this!','Hehehe.'],
-  death: ['Tell mum I was spiky!','Worth it…','I regret nothing!','Bye-bye!','Curl up… and…','Avenge meeee!'],
+  turn: ['Let\'s roll!','Fish time!','Hold my fish.','Here goes nothing!','Tactical waddle!','Watch this!','Hehehe.'],
+  death: ['Tell mum I was fluffy!','Worth it…','I regret nothing!','Bye-bye!','Waddle… on… without me…','Avenge meeee!'],
   fire: ['Fire in the hole!','Catch!','Special delivery!','Yoink!','Ta-daa!'],
   burn: ['Hot hot hot!','Spicy!','My toesies!'],
   gas: ['Pee-yew!','It stinks!','My nose!','Who did that?!','*cough* *cough*'],
@@ -71,7 +71,7 @@ const WEAPONS = [
   { id:'slap',     name:'Fish Slap',      kind:'instant',hint:'Melee. Huge shove toward the water!', desc:'Melee. A wet fish to the face sends the target flying sideways. Aim at water.', stats:'30 dmg · massive shove' },
   { id:'thunder',  name:'Thundercloud',   kind:'click',  hint:'Click a spot: 3 lightning bolts.', air:true, desc:'Click a spot. A storm cloud forms and fires three lightning bolts at the ground below.', stats:'3 bolts × 34 dmg · R 34' },
   { id:'acorn',    name:'Giant Acorn',    kind:'charge', hint:'Enormous bouncing bomb, 4s fuse.', desc:'Throw a giant bouncing acorn with a 4 s fuse. Slow, heavy, devastating.', stats:'90 dmg · R 95 · fuse 4 s' },
-  { id:'bowling',  name:'Hedge Bowling',  kind:'charge', hint:'Rolls along the ground, bowling critters over.', desc:'Rolls along the ground and bowls over every critter it meets, then pops.', stats:'14–30 dmg per hit · 20 dmg burst' },
+  { id:'bowling',  name:'Penguin Bowling',  kind:'charge', hint:'Rolls along the ground, bowling critters over.', desc:'Rolls along the ground and bowls over every critter it meets, then pops.', stats:'14–30 dmg per hit · 20 dmg burst' },
   { id:'boomerang',name:'Twig Boomerang', kind:'charge', hint:'Curves back to you. Catch it or duck!', desc:'Flies out, curves back to you. Hits an enemy and it explodes; reaches you and you catch it.', stats:'32 dmg · R 36 · returns' },
   { id:'mortar',   name:'Acorn Mortar',   kind:'charge', hint:'Three shells in a burst.', desc:'Three shells fired in a quick burst along the same arc. Spreads a little.', stats:'3 × 22 dmg · R 30' },
   { id:'sunbeam',  name:'Sunbeam',        kind:'instant',hint:'Laser that burns through anything.', desc:'A laser that burns a straight tunnel through terrain and anyone standing in it.', stats:'26 dmg per critter · pierces' },
@@ -114,7 +114,7 @@ const WEAPONS = [
   { id:'dubstep',  name:'Wub Horn',       kind:'instant',cat:'fire', hint:'WUB WUB. Wide bass blast.', desc:'A horn that plays one enormous bass drop. Everyone in a wide cone in front of you is hurt a little and thrown a lot.', stats:'12 dmg · wide shove' },
   // ---- more melee ----
   { id:'axe',      name:'Lumber Axe',     kind:'instant',cat:'melee', hint:'Melee. Chops their HP in half!', desc:'A swing of the axe halves the victim\'s current HP, whatever it is. Best used on someone healthy.', stats:'halves HP · melee' },
-  { id:'punch',    name:'Spiky Uppercut', kind:'instant',cat:'melee', hint:'Melee. Launches them sky-high.', desc:'A flaming uppercut that sends the target straight up. What goes up comes down, and the landing hurts too.', stats:'30 dmg · launches up' },
+  { id:'punch',    name:'Flipper Uppercut', kind:'instant',cat:'melee', hint:'Melee. Launches them sky-high.', desc:'A flaming uppercut that sends the target straight up. What goes up comes down, and the landing hurts too.', stats:'30 dmg · launches up' },
   { id:'prod',     name:'Nose Poke',      kind:'instant',cat:'melee', hint:'Melee. A tiny nudge. Mind the edge.', desc:'The gentlest attack in the game: a poke on the nose that nudges the target one step back. Devastating next to a cliff.', stats:'0 dmg · nudge' },
   { id:'chainsaw', name:'Hedge Trimmer',  kind:'instant',cat:'melee', hint:'Melee. Cuts critters and terrain.', desc:'Rev it up and swing: carves a short tunnel in the direction you aim and shreds any critter in the way.', stats:'25 dmg · cuts terrain' },
   { id:'kamikaze', name:'Kamikaze',       kind:'instant',cat:'melee', hint:'Fly through anything, then explode. You die.', desc:'Fling yourself along your aim straight through terrain and critters, then explode. Your critter does not survive this.', stats:'30 dmg on the way + 60 burst' },
@@ -137,7 +137,7 @@ const WEAPONS = [
   // ---- more critters to unleash ----
   { id:'squirrel', name:'Super Squirrel', kind:'place',  cat:'animal', hint:'Space to launch · ←→ steer · Space: boom', desc:'A flying squirrel in a cape. Steer it with ←→ for up to twelve seconds and press fire to detonate, or let it hit something.', stats:'70 dmg · R 65 · steerable' },
   { id:'cows',     name:'Stampede',       kind:'place',  cat:'animal', hint:'Three charging cows.', desc:'Releases three cows one after another. They charge ahead and explode on the first enemy they bump into.', stats:'3 × 45 dmg · R 48' },
-  { id:'granny',   name:'Auntie Prickles',kind:'place',  cat:'animal', hint:'Slow, sweet and devastating.', desc:'A sweet old hedgehog shuffles forward with her handbag. She is slow, and when she reaches someone the handbag goes off.', stats:'85 dmg · R 85 · slow' },
+  { id:'granny',   name:'Auntie Waddles',kind:'place',  cat:'animal', hint:'Slow, sweet and devastating.', desc:'A sweet old penguin shuffles forward with her handbag. She is slow, and when she reaches someone the handbag goes off.', stats:'85 dmg · R 85 · slow' },
   { id:'rhino',    name:'Rhino Beetle',   kind:'place',  cat:'animal', hint:'Rams everyone, bounces off walls.', desc:'A rhino beetle that charges at full tilt, flinging aside anyone it hits and bouncing off walls, until it tires.', stats:'35 dmg per ram · no bang' },
   { id:'ferrets',  name:'Ferret Trio',    kind:'place',  cat:'animal', hint:'Three fast, hoppy, explosive ferrets.', desc:'Three excitable ferrets that scamper and hop ahead and pop on the first enemy they reach.', stats:'3 × 28 dmg · R 34' },
   { id:'boar',     name:'Boar Rush',      kind:'place',  cat:'animal', hint:'Plows straight through terrain!', desc:'A boar that cannot be stopped: it plows a tunnel straight through hills and anyone in them, all the way across the map.', stats:'40 dmg per hit · digs' },
@@ -163,7 +163,7 @@ const WEAPONS = [
   { id:'cratespy', name:'Crate Spy',      kind:'tool',   cat:'util', hint:'Space: see what every crate holds.', util:true, desc:'From now on your team can see what is inside every crate on the map, including which ones are traps.', stats:'reveals crates · permanent' },
   { id:'crateshower', name:'Crate Shower', kind:'tool',  cat:'util', hint:'Space: four crates fall right now.', util:true, desc:'Calls in four crates at once, scattered over the map. First come, first served.', stats:'4 crates' },
   { id:'selectcritter', name:'Pick a Critter', kind:'click', cat:'util', hint:'Click one of your critters to control it.', util:true, desc:'Click any of your own critters to take this turn with them instead. Use it before you move.', stats:'switch critter' },
-  { id:'hibernate',name:'Hibernate',      kind:'tool',   cat:'util', hint:'Space: curl up in ice until your next turn.', util:true, desc:'Curl up in a block of ice until your next turn: half damage, and nothing can knock you off your perch. Ends your move.', stats:'half dmg · immovable · ends turn' },
+  { id:'hibernate',name:'Huddle',      kind:'tool',   cat:'util', hint:'Space: huddle in ice until your next turn.', util:true, desc:'Huddle down in a block of ice until your next turn: half damage, and nothing can knock you off your perch. Ends your move.', stats:'half dmg · immovable · ends turn' },
   { id:'skip',     name:'Skip Turn',      kind:'tool',   hint:'Space: snooze.', util:true, desc:'Take a nap and pass the turn. Sometimes the best move.', stats:'ends turn' },
 ];
 const WEAP = Object.fromEntries(WEAPONS.map(w => [w.id, w]));

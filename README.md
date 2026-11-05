@@ -1,6 +1,6 @@
 # Crater Critters
 
-A turn-based artillery brawl (hedgehog-like critters, destructible islands, 105 weapons),
+A turn-based artillery brawl (penguin critters, destructible islands, 105 weapons),
 hot-seat or online for up to 8 players. Live at https://critters.charsi.cc.
 
 ## Layout

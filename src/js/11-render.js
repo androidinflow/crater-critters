@@ -160,37 +160,37 @@ function drawCritter(x, c, t) {
   // lean into the walk (more when shoving against a wall), gentle sway while idle
   x.rotate(wk * (c.blocked ? 0.3 : 0.13) + (idle > 1 ? Math.sin(t * 1.4 + c.seed) * 0.025 : 0) + yawn * -0.08);
   const scared = c.dyingT <= 0 && c.faceT <= 0 && (c.tumble || (c.mode === 'air' && c.vy > 330));
-  // quills along the back & top
-  x.fillStyle = '#6b4427'; x.strokeStyle = '#3b2414'; x.lineWidth = 1;
-  for (let i = 0; i < 9; i++) {
-    const a = Math.PI * 0.72 + i * (Math.PI * 1.08 / 8);
-    const wob = Math.sin(t * 6 + i + c.seed) * 0.05 + (c.hurtT > 0 || scared ? 0.35 : 0) + Math.sin(ph + i * 0.3) * 0.1 * wk + ruffle;
-    const len = r * (1.5 + wob + (i % 2) * 0.15);
-    const sw = -wk * 0.12; // quills trail behind while walking
-    x.beginPath(); x.moveTo(Math.cos(a - 0.2) * r * 0.85, Math.sin(a - 0.2) * r * 0.85);
-    x.lineTo(Math.cos(a + sw) * len, Math.sin(a + sw) * len); x.lineTo(Math.cos(a + 0.2) * r * 0.85, Math.sin(a + 0.2) * r * 0.85); x.fill(); x.stroke();
-  }
+  // --- penguin: dark coat, white front, two flippers, orange beak and feet ---
+  const coat = '#262a3a', coatLine = '#121420', front = c.face === 4 && c.faceT > 0 ? '#d9e6bd' : '#f6f2e8';
+  // flipper angle: swings with the walk, flaps when startled or airborne, waves a little when bored
+  const flap = Math.sin(ph) * 0.5 * wk + (idle > 1 ? Math.sin(t * 1.7 + c.seed) * 0.05 : 0) + ruffle * 1.5 + (c.hurtT > 0 || scared ? 0.9 : 0) + (c.mode === 'air' && !c.tumble ? 0.6 : 0) + yawn * 0.4;
+  // far flipper (behind the body)
+  x.fillStyle = coat; x.strokeStyle = coatLine; x.lineWidth = 1.2;
+  x.save(); x.translate(-r * 0.5, -r * 0.15); x.rotate(0.45 + flap * 0.6); x.beginPath(); x.ellipse(0, r * 0.5, r * 0.22, r * 0.58, 0, 0, 7); x.fill(); x.stroke(); x.restore();
   // feet: stepping cycle while walking (swing forward + lift), tapping while bored
-  x.fillStyle = '#e09a6a'; x.strokeStyle = '#3b2414'; x.lineWidth = 1.2;
+  x.fillStyle = '#ff9f1c'; x.strokeStyle = '#a65d08'; x.lineWidth = 1.2;
   const s1 = Math.sin(ph) * wk, s2 = Math.sin(ph + Math.PI) * wk;
-  x.beginPath(); x.ellipse(-3.5 + s1 * 3.2, r - 0.5 - Math.max(0, s1) * 2.4 + bob * 0.5, 3.5, 2.2, s1 * 0.3, 0, 7); x.fill(); x.stroke();
-  x.beginPath(); x.ellipse(4 + s2 * 3.2, r - 0.5 - Math.max(0, s2) * 2.4 - tap * 2.6 + bob * 0.5, 3.5, 2.2, s2 * 0.3 - tap * 0.5, 0, 7); x.fill(); x.stroke();
-  // body
-  x.fillStyle = '#b5814f'; x.lineWidth = 1.4; circ(x, 0, 0, r); x.fill(); x.stroke();
-  x.fillStyle = c.face === 4 && c.faceT > 0 ? '#cfe7a0' : '#f2d3a8'; x.beginPath(); x.ellipse(r * 0.35, r * 0.15, r * 0.62, r * 0.72, 0, 0, 7); x.fill();
+  x.beginPath(); x.ellipse(-3.5 + s1 * 3.2, r - 0.5 - Math.max(0, s1) * 2.4 + bob * 0.5, 4, 2.2, s1 * 0.3, 0, 7); x.fill(); x.stroke();
+  x.beginPath(); x.ellipse(4 + s2 * 3.2, r - 0.5 - Math.max(0, s2) * 2.4 - tap * 2.6 + bob * 0.5, 4, 2.2, s2 * 0.3 - tap * 0.5, 0, 7); x.fill(); x.stroke();
+  // body: an egg, a little taller than it is wide
+  x.fillStyle = coat; x.strokeStyle = coatLine; x.lineWidth = 1.4; x.beginPath(); x.ellipse(0, -r * 0.08, r * 0.98, r * 1.12, 0, 0, 7); x.fill(); x.stroke();
+  // white front and face patch
+  x.fillStyle = front; x.beginPath(); x.ellipse(r * 0.18, r * 0.24, r * 0.6, r * 0.72, 0, 0, 7); x.fill();
+  x.beginPath(); x.ellipse(r * 0.42, -r * 0.42, r * 0.5, r * 0.46, 0, 0, 7); x.fill();
   // soot smudges when burnt
-  if (c.face === 3 && c.faceT > 0) { x.fillStyle = 'rgba(40,30,25,0.55)'; x.beginPath(); x.ellipse(r * 0.25, r * 0.5, 2.6, 1.5, 0.4, 0, 7); x.fill(); x.beginPath(); x.ellipse(r * 0.75, -r * 0.6, 2, 1.3, -0.5, 0, 7); x.fill(); }
-  // team bandana with fluttering tails (flutter harder while moving)
-  x.strokeStyle = col; x.lineWidth = 3.2; x.beginPath(); x.arc(0, 0, r - 1.2, -Math.PI * 0.92, -Math.PI * 0.18); x.stroke();
+  if (c.face === 3 && c.faceT > 0) { x.fillStyle = 'rgba(40,30,25,0.5)'; x.beginPath(); x.ellipse(r * 0.25, r * 0.4, 2.6, 1.5, 0.4, 0, 7); x.fill(); x.beginPath(); x.ellipse(r * 0.6, -r * 0.2, 2, 1.3, -0.5, 0, 7); x.fill(); }
+  // near flipper
+  x.fillStyle = coat; x.strokeStyle = coatLine; x.lineWidth = 1.2;
+  x.save(); x.translate(r * 0.15, -r * 0.1); x.rotate(-(0.2 + flap * 0.9)); x.beginPath(); x.ellipse(0, r * 0.52, r * 0.22, r * 0.6, 0, 0, 7); x.fill(); x.stroke(); x.restore();
+  // team scarf around the neck, tails fluttering behind (harder while moving)
+  x.strokeStyle = col; x.lineWidth = 3.4; x.lineCap = 'round'; x.beginPath(); x.arc(0, -r * 1.0, r * 0.72, Math.PI * 0.1, Math.PI * 0.9); x.stroke(); x.lineCap = 'butt';
   x.fillStyle = col; const tw = Math.sin(t * 9 + c.seed) * (2 + wk * 3), tb = wk * 3;
-  x.beginPath(); x.moveTo(-r * 0.85, -r * 0.4); x.lineTo(-r * 1.55 - tb, -r * 0.55 + tw); x.lineTo(-r * 1.4 - tb, -r * 0.1 + tw); x.closePath(); x.fill();
+  x.beginPath(); x.moveTo(-r * 0.62, -r * 0.55); x.lineTo(-r * 1.4 - tb, -r * 0.6 + tw); x.lineTo(-r * 1.25 - tb, -r * 0.15 + tw); x.closePath(); x.fill();
   // bandage once badly hurt
   const lowHp = c.alive && c.hp - c.pending <= 30 && c.hp > 0;
-  if (lowHp) { x.strokeStyle = '#f4f1ea'; x.lineWidth = 2.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(r * 0.05, -r * 0.95); x.lineTo(r * 0.45, -r * 0.62); x.moveTo(r * 0.4, -r * 0.98); x.lineTo(r * 0.1, -r * 0.6); x.stroke(); x.lineCap = 'butt'; }
-  // nose
-  x.fillStyle = '#2b1d12'; circ(x, r * 0.98, r * 0.12, 1.8); x.fill();
+  if (lowHp) { x.strokeStyle = '#f4f1ea'; x.lineWidth = 2.2; x.lineCap = 'round'; x.beginPath(); x.moveTo(-r * 0.3, -r * 1.15); x.lineTo(r * 0.1, -r * 0.85); x.moveTo(r * 0.05, -r * 1.2); x.lineTo(-r * 0.25, -r * 0.85); x.stroke(); x.lineCap = 'butt'; }
   // eyes
-  const eyes = [[r * 0.18, -r * 0.32, r * 0.36], [r * 0.62, -r * 0.28, r * 0.33]];
+  const eyes = [[r * 0.22, -r * 0.5, r * 0.3], [r * 0.62, -r * 0.46, r * 0.28]];
   const face = c.faceT > 0 ? c.face : 0, dying = c.dyingT > 0, sad = c.sadT > 0 && !face;
   const focus = active && g.charging && !face;
   for (let k = 0; k < 2; k++) {
@@ -216,21 +216,23 @@ function drawCritter(x, c, t) {
       x.fillStyle = '#111'; circ(x, ex + c.px * f * er / 4, ey + c.py * er / 4, er * (yawn > 0.3 ? 0.3 : 0.48)); x.fill();
       // eyelids: blink, sad droop, yawn squint, tired half-lid at low HP
       const lid = Math.max(blink, sad ? 0.55 : 0, yawn * 0.8, lowHp ? 0.25 : 0);
-      if (lid > 0) { x.fillStyle = '#b5814f'; x.fillRect(ex - er - 0.5, ey - er - 0.5, er * 2 + 1, er * 2 * lid * 0.95); x.beginPath(); x.moveTo(ex - er, ey - er + er * 2 * lid * 0.95); x.lineTo(ex + er, ey - er + er * 2 * lid * 0.95); x.stroke(); }
+      if (lid > 0) { x.fillStyle = front; x.fillRect(ex - er - 0.5, ey - er - 0.5, er * 2 + 1, er * 2 * lid * 0.95); x.beginPath(); x.moveTo(ex - er, ey - er + er * 2 * lid * 0.95); x.lineTo(ex + er, ey - er + er * 2 * lid * 0.95); x.stroke(); }
       if (focus) { x.lineWidth = 1.6; x.beginPath(); x.moveTo(ex - er * 0.9, ey - er * 1.1 - (k ? 0.5 : 0)); x.lineTo(ex + er * 0.9, ey - er * 0.75 - (k ? -0.4 : 0)); x.stroke(); } // determined brows
     }
   }
-  // mouth
-  x.strokeStyle = '#2b1d12'; x.lineWidth = 1.2; x.beginPath();
-  if (dying || face === 1 || face === 2 || scared) { x.fillStyle = '#5a1a1a'; x.ellipse(r * 0.55, r * 0.42, face === 2 ? 2.6 : 2, scared ? 3.2 : 2.6, 0, 0, 7); x.fill(); }
-  else if (face === 4) { x.moveTo(r * 0.3, r * 0.45); x.lineTo(r * 0.8, r * 0.45); x.stroke(); x.fillStyle = '#e06c8a'; x.beginPath(); x.ellipse(r * 0.6, r * 0.62, 1.8, 2.6, 0, 0, 7); x.fill(); } // tongue out
-  else if (face === 3) { x.moveTo(r * 0.3, r * 0.45); for (let i = 1; i <= 5; i++) x.lineTo(r * 0.3 + i * r * 0.1, r * 0.45 + (i % 2 ? -1.5 : 1.5)); x.stroke(); }
-  else if (yawn > 0.2) { x.fillStyle = '#5a1a1a'; x.ellipse(r * 0.55, r * 0.45, 2.2 * yawn + 0.5, 3.4 * yawn + 0.5, 0, 0, 7); x.fill(); }
-  else if (sad) { x.moveTo(r * 0.3, r * 0.5); x.quadraticCurveTo(r * 0.55, r * 0.3, r * 0.8, r * 0.5); x.stroke(); x.fillStyle = '#ff7aa2'; x.beginPath(); x.ellipse(r * 0.62, r * 0.55, 1.6, 2.4, 0.3, 0, 7); x.fill(); }
-  else if (focus) { x.moveTo(r * 0.35, r * 0.42); x.lineTo(r * 0.8, r * 0.42); x.stroke(); }
-  else { x.arc(r * 0.55, r * 0.3, 2.6, 0.2, Math.PI - 0.2); x.stroke(); }
+  // beak: shut, chattering open when hurt/dizzy/scared, wide for a yawn, tongue out when gassed
+  const open = dying || face === 1 || face === 2 || scared ? 0.55 : yawn > 0.2 ? yawn * 0.9 : face === 4 ? 0.3 : 0;
+  const bx = r * 0.78, by = -r * 0.18;
+  x.lineJoin = 'round'; x.lineWidth = 1.1;
+  if (open > 0) { x.fillStyle = '#5a1a1a'; x.beginPath(); x.moveTo(bx, by - 1); x.lineTo(bx + r * 0.45, by + r * 0.15 * open); x.lineTo(bx, by + r * 0.3 * open + 2); x.closePath(); x.fill(); }
+  x.fillStyle = '#ff9f1c'; x.strokeStyle = '#a65d08';
+  x.beginPath(); x.moveTo(bx, by - r * 0.1); x.lineTo(bx + r * 0.5, by + r * 0.05 - open * r * 0.12); x.lineTo(bx, by + r * 0.12); x.closePath(); x.fill(); x.stroke();
+  x.beginPath(); x.moveTo(bx, by + r * 0.1 + open * r * 0.3); x.lineTo(bx + r * 0.42, by + r * 0.12 + open * r * 0.4); x.lineTo(bx, by + r * 0.28 + open * r * 0.35); x.closePath(); x.fill(); x.stroke();
+  if (face === 4 && open) { x.fillStyle = '#e06c8a'; x.beginPath(); x.ellipse(bx + r * 0.2, by + r * 0.3, 1.8, 2.4, 0.3, 0, 7); x.fill(); }
+  else if (sad) { x.fillStyle = '#ff7aa2'; x.beginPath(); x.ellipse(bx - r * 0.15, by + r * 0.42, 1.6, 2.2, 0.3, 0, 7); x.fill(); }   // a blush of embarrassment
+  if (focus) { x.strokeStyle = '#121420'; x.lineWidth = 1.4; x.beginPath(); x.moveTo(r * 0.05, -r * 0.85); x.lineTo(r * 0.4, -r * 0.78); x.moveTo(r * 0.5, -r * 0.8); x.lineTo(r * 0.85, -r * 0.72); x.stroke(); }   // determined brows
   // sweat drop when struggling against a wall or badly hurt
-  if ((c.blocked && wk > 0.5) || (lowHp && Math.sin(t * 1.1 + c.seed) > 0.6)) { x.fillStyle = '#9ad7ff'; x.beginPath(); x.ellipse(r * 0.95, -r * 0.75 + (t * 10 % 6), 1.3, 2, 0, 0, 7); x.fill(); }
+  if ((c.blocked && wk > 0.5) || (lowHp && Math.sin(t * 1.1 + c.seed) > 0.6)) { x.fillStyle = '#9ad7ff'; x.beginPath(); x.ellipse(r * 0.85, -r * 1.05 + (t * 10 % 6), 1.3, 2, 0, 0, 7); x.fill(); }
   // poisoned: a sickly green tint and the odd bubble
   if (c.poison > 0) {
     x.fillStyle = 'rgba(120,200,40,0.28)'; circ(x, 0, 0, r + 1); x.fill();
@@ -244,7 +246,7 @@ function drawCritter(x, c, t) {
   // dizzy stars circling the head
   if (face === 2) {
     x.fillStyle = '#ffe066'; x.strokeStyle = '#8a6a00'; x.lineWidth = 0.6;
-    for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1, sx = Math.cos(a) * r * 1.2, sy = -r * 1.35 + Math.sin(a) * r * 0.35; star(x, sx, sy, 2.4); x.fill(); x.stroke(); }
+    for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.1, sx = Math.cos(a) * r * 1.2, sy = -r * 1.5 + Math.sin(a) * r * 0.35; star(x, sx, sy, 2.4); x.fill(); x.stroke(); }
   }
   x.restore();
   // Dandelion Chute: a seed-head canopy above the critter (drawn unrotated, in world space)

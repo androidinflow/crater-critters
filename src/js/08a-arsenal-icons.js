@@ -18,13 +18,16 @@ function iconBird(x, col, beak) {
 }
 function iconDrop(x, dy, type) { x.save(); x.translate(0, dy); x.scale(0.55, 0.55); drawIconMore(x, type); x.restore(); }
 function iconCloudBg(x) { x.fillStyle = '#9aa3ad'; circ(x, -8, -6, 7); x.fill(); x.stroke(); circ(x, 3, -10, 9); x.fill(); x.stroke(); circ(x, 11, -4, 6); x.fill(); x.stroke(); }
-function iconHog(x, col) { // a small critter silhouette for the animal weapons
-  x.fillStyle = '#6b4427'; x.strokeStyle = '#3b2414'; x.lineWidth = 1;
-  for (let i = 0; i < 7; i++) { const a = Math.PI * 0.75 + i * 0.26; x.beginPath(); x.moveTo(Math.cos(a - 0.15) * 9, 2 + Math.sin(a - 0.15) * 9); x.lineTo(Math.cos(a) * 16, 2 + Math.sin(a) * 16); x.lineTo(Math.cos(a + 0.15) * 9, 2 + Math.sin(a + 0.15) * 9); x.fill(); x.stroke(); }
-  x.strokeStyle = '#2b1d12'; x.lineWidth = 2; circ(x, 0, 2, 10); fs(x, col || '#b5814f');
-  x.fillStyle = '#f2d3a8'; x.beginPath(); x.ellipse(4, 4, 6, 7, 0, 0, 7); x.fill();
-  x.fillStyle = '#fff'; circ(x, 3, -1, 3); x.fill(); circ(x, 8, 0, 2.6); x.fill(); x.fillStyle = '#111'; circ(x, 4, -1, 1.4); x.fill(); circ(x, 9, 0, 1.2); x.fill(); circ(x, 11, 4, 1.5); x.fill();
-  x.lineWidth = 2.5;
+function iconPenguin(x, scarf) { // a small penguin for the critter-shaped weapons
+  x.fillStyle = '#262a3a'; x.strokeStyle = '#121420'; x.lineWidth = 2;
+  x.beginPath(); x.ellipse(-9, 4, 4, 8, 0.5, 0, 7); x.fill(); x.stroke();
+  x.beginPath(); x.ellipse(0, 1, 11, 13, 0, 0, 7); x.fill(); x.stroke();
+  x.fillStyle = '#f6f2e8'; x.beginPath(); x.ellipse(2, 4, 6.5, 8.5, 0, 0, 7); x.fill(); x.beginPath(); x.ellipse(4, -5, 5.5, 5, 0, 0, 7); x.fill();
+  x.fillStyle = '#ff9f1c'; x.strokeStyle = '#a65d08'; x.lineWidth = 1.2; x.beginPath(); x.moveTo(8, -4); x.lineTo(15, -2); x.lineTo(8, 0); x.closePath(); x.fill(); x.stroke();
+  x.beginPath(); x.ellipse(-3, 14, 4, 2, 0, 0, 7); x.fill(); x.stroke(); x.beginPath(); x.ellipse(4, 14, 4, 2, 0, 0, 7); x.fill(); x.stroke();
+  x.fillStyle = '#fff'; circ(x, 2, -6, 2.8); x.fill(); circ(x, 7, -5, 2.4); x.fill(); x.fillStyle = '#111'; circ(x, 3, -6, 1.3); x.fill(); circ(x, 8, -5, 1.1); x.fill();
+  if (scarf) { x.strokeStyle = scarf; x.lineWidth = 2.5; x.beginPath(); x.arc(0, -9, 7, 0.3, 2.84); x.stroke(); }
+  x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5;
 }
 function drawIconMore(x, id) {
   switch (id) {
@@ -104,8 +107,8 @@ function drawIconMore(x, id) {
     case 'chainsaw':
       rr(x, -16, -6, 16, 14, 3); fs(x, '#ff7b39'); rr(x, -2, -3, 24, 7, 3); fs(x, '#9aa3ad');
       x.fillStyle = '#2b1d12'; for (let i = 0; i < 6; i++) { x.fillRect(i * 4, -5, 2, 2); x.fillRect(2 + i * 4, 4, 2, 2); } rr(x, -20, -2, 5, 6, 1); fs(x, '#2b1d12'); break;
-    case 'kamikaze': iconHog(x); x.strokeStyle = '#e63946'; x.lineWidth = 3; x.beginPath(); x.moveTo(-10, -8); x.lineTo(10, -8); x.stroke(); x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(-18, 2); x.lineTo(-26, 2); x.moveTo(-18, -2); x.lineTo(-24, -5); x.moveTo(-18, 6); x.lineTo(-24, 9); x.stroke(); break;
-    case 'suicide': iconHog(x); x.save(); x.translate(10, -14); x.scale(0.45, 0.45); drawIcon(x, 'dynamite', 40); x.restore(); break;
+    case 'kamikaze': iconPenguin(x); x.strokeStyle = '#e63946'; x.lineWidth = 3; x.beginPath(); x.moveTo(-10, -8); x.lineTo(10, -8); x.stroke(); x.strokeStyle = '#2b1d12'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(-18, 2); x.lineTo(-26, 2); x.moveTo(-18, -2); x.lineTo(-24, -5); x.moveTo(-18, 6); x.lineTo(-24, 9); x.stroke(); break;
+    case 'suicide': iconPenguin(x); x.save(); x.translate(10, -14); x.scale(0.45, 0.45); drawIcon(x, 'dynamite', 40); x.restore(); break;
     // ---- sky & map ----
     case 'napalm': iconBird(x, '#fff', '#ff9f1c'); iconDrop(x, 14, 'molotov'); break;
     case 'minestrike': iconBird(x, '#fff', '#ff9f1c'); x.save(); x.translate(0, 16); x.fillStyle = '#3b3b45'; x.beginPath(); x.ellipse(0, 1, 8, 5, 0, 0, 7); x.fill(); x.stroke(); x.fillStyle = '#ff2a2a'; circ(x, 0, -2, 2.5); x.fill(); x.restore(); break;
@@ -138,7 +141,7 @@ function drawIconMore(x, id) {
     case 'abduct':
       x.beginPath(); x.ellipse(0, -8, 18, 6, 0, 0, 7); fs(x, '#9aa3ad'); x.beginPath(); x.arc(0, -10, 8, Math.PI, 0); fs(x, '#8ef');
       x.fillStyle = 'rgba(140,238,255,0.45)'; x.beginPath(); x.moveTo(-6, -4); x.lineTo(6, -4); x.lineTo(14, 18); x.lineTo(-14, 18); x.closePath(); x.fill();
-      x.save(); x.translate(0, 8); x.scale(0.5, 0.5); iconHog(x); x.restore(); break;
+      x.save(); x.translate(0, 8); x.scale(0.5, 0.5); iconPenguin(x); x.restore(); break;
     // ---- critters ----
     case 'squirrel':
       x.fillStyle = '#e63946'; x.beginPath(); x.moveTo(-6, -8); x.lineTo(-22, -2); x.lineTo(-20, 10); x.lineTo(-6, 4); x.closePath(); x.fill(); x.stroke();
@@ -151,7 +154,7 @@ function drawIconMore(x, id) {
       x.strokeStyle = '#2b1d12'; x.beginPath(); x.moveTo(10, -8); x.lineTo(8, -14); x.moveTo(18, -8); x.lineTo(20, -14); x.stroke(); x.fillStyle = '#111'; circ(x, 12, -5, 1.2); x.fill();
       x.beginPath(); x.moveTo(-10, 11); x.lineTo(-10, 17); x.moveTo(-2, 11); x.lineTo(-2, 17); x.moveTo(6, 11); x.lineTo(6, 17); x.stroke(); break;
     case 'granny':
-      iconHog(x); x.fillStyle = '#c77dff'; x.beginPath(); x.arc(-6, -8, 7, Math.PI, 0); x.fill(); x.stroke(); x.fillStyle = '#ffd23f'; circ(x, -6, -15, 2); x.fill();
+      iconPenguin(x); x.fillStyle = '#c77dff'; x.beginPath(); x.arc(-6, -8, 7, Math.PI, 0); x.fill(); x.stroke(); x.fillStyle = '#ffd23f'; circ(x, -6, -15, 2); x.fill();
       x.strokeStyle = '#2b1d12'; x.lineWidth = 1.5; circ(x, 3, -1, 4); x.stroke(); circ(x, 8, 0, 3.6); x.stroke(); x.lineWidth = 2.5;
       rr(x, 10, 6, 10, 9, 2); fs(x, '#e63946'); x.beginPath(); x.moveTo(12, 6); x.quadraticCurveTo(15, 0, 18, 6); x.stroke(); break;
     case 'rhino':
@@ -203,9 +206,9 @@ function drawIconMore(x, id) {
       circ(x, 10, 8, 9); fs(x, 'rgba(255,255,255,0.8)'); x.lineWidth = 3; x.beginPath(); x.moveTo(16, 14); x.lineTo(24, 22); x.stroke(); x.lineWidth = 2.5; break;
     case 'crateshower':
       for (const [dx, dy, s] of [[-12, -10, 0.5], [10, -14, 0.45], [0, 4, 0.7]]) { x.save(); x.translate(dx, dy); x.scale(s, s); x.lineWidth = 2.5 / s; rr(x, -12, -12, 24, 24, 2); fs(x, '#b5814f'); x.beginPath(); x.moveTo(-12, -12); x.lineTo(12, 12); x.moveTo(12, -12); x.lineTo(-12, 12); x.stroke(); x.restore(); } break;
-    case 'selectcritter': iconHog(x); x.strokeStyle = '#ffd23f'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(0, -24); x.lineTo(-6, -18); x.lineTo(6, -18); x.closePath(); x.fillStyle = '#ffd23f'; x.fill(); x.strokeStyle = '#2b1d12'; x.stroke(); break;
+    case 'selectcritter': iconPenguin(x); x.strokeStyle = '#ffd23f'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(0, -24); x.lineTo(-6, -18); x.lineTo(6, -18); x.closePath(); x.fillStyle = '#ffd23f'; x.fill(); x.strokeStyle = '#2b1d12'; x.stroke(); break;
     case 'hibernate':
-      x.globalAlpha = 0.6; rr(x, -16, -16, 32, 32, 4); fs(x, '#bfe9ff'); x.globalAlpha = 1; x.save(); x.scale(0.75, 0.75); iconHog(x); x.restore();
+      x.globalAlpha = 0.6; rr(x, -16, -16, 32, 32, 4); fs(x, '#bfe9ff'); x.globalAlpha = 1; x.save(); x.scale(0.75, 0.75); iconPenguin(x); x.restore();
       x.fillStyle = '#5a6b8c'; x.font = 'bold 12px sans-serif'; x.textAlign = 'center'; x.fillText('z', 12, -10); x.fillText('Z', 17, -17); break;
     case 'ferret':
       x.beginPath(); x.ellipse(-2, 2, 14, 6, 0, 0, 7); fs(x, '#d9b991'); circ(x, 11, -2, 5); fs(x, '#d9b991'); x.fillStyle = '#8d5a2b'; x.beginPath(); x.ellipse(-2, 2, 9, 3.5, 0, 0, 7); x.fill();
