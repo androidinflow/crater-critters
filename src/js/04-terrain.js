@@ -1,11 +1,13 @@
 // ============================== TERRAIN ==============================
-// The landscape is a W×H bitmap: `mask` (1 = solid) for collision and an RGBA buffer
-// (`buf`, a Uint32 view over ImageData) for drawing. Explosions edit both and push
-// only the dirty rectangle to the terrain canvas.
+// The landscape is a W×H bitmap: `mask` (1 = solid) for collision, `base` (unlit colours)
+// and `buf` (lit colours, a Uint32 view over ImageData) for drawing. A light from the
+// top-left is baked in by `relight`: pixels a few px from air above/left brighten, pixels
+// near air below/right darken, which gives the flat bitmap edges, rims and undersides.
+// Explosions edit mask + base, relight the dirty rectangle and push only that to the canvas.
 const Terrain = {
   W: CFG.W, H: CFG.H, mask: null, buf: null, img: null, cvs: null, ctx: null, cavern: false, ceilArr: null, style: 'Island', theme: THEMES.Meadow, themeName: 'Meadow', decor: [], version: 0,
   init() {
-    this.mask = new Uint8Array(this.W * this.H);
+    this.mask = new Uint8Array(this.W * this.H); this.base = new Uint32Array(this.W * this.H);
     this.cvs = document.createElement('canvas'); this.cvs.width = this.W; this.cvs.height = this.H;
     this.ctx = this.cvs.getContext('2d');
     this.img = this.ctx.createImageData(this.W, this.H);
@@ -22,8 +24,8 @@ const Terrain = {
     this.themeName = THEMES[themeName] ? themeName : 'Meadow'; this.theme = THEMES[this.themeName];
     m.fill(0);
     if (style === 'Custom') {   // beta: the player's own image, stamped above the water line
-      this.buf.fill(0); this.ceilArr = new Float32Array(W).fill(-1);
-      MapImage.stamp(this); this.decorate(rng, this.ceilArr); this.ctx.putImageData(this.img, 0, 0); this.version++; return;
+      this.base.fill(0); this.ceilArr = new Float32Array(W).fill(-1);
+      MapImage.stamp(this); this.decorate(rng, this.ceilArr); this.paintAll(true); return;
     }
     const nA = noise1(rng), nB = noise1(rng), nC = noise1(rng), n2 = noise2(rng);
     const water = CFG.WATER0;
@@ -120,19 +122,49 @@ const Terrain = {
   },
   // Colour every solid pixel based on its vertical depth below the surface (grass → dirt strata)
   // and its height above an underside (roots / cave rock).
-  paintAll() {
-    const W = this.W, H = this.H, m = this.mask, buf = this.buf, up = new Uint16Array(H);
-    for (let x = 0; x < W; x++) {
+  paintAll(custom = false) {
+    const W = this.W, H = this.H, m = this.mask, base = this.base, up = new Uint16Array(H);
+    if (!custom) for (let x = 0; x < W; x++) {
       let run = 0;
       for (let y = H - 1; y >= 0; y--) { if (m[y * W + x]) { run++; up[y] = run; } else run = 0; }
       let down = 0;
       for (let y = 0; y < H; y++) {
         const i = y * W + x;
-        if (!m[i]) { down = 0; buf[i] = 0; continue; }
-        down++; buf[i] = this.colorAt(x, y, down, up[y]);
+        if (!m[i]) { down = 0; base[i] = 0; continue; }
+        down++; base[i] = this.colorAt(x, y, down, up[y]);
       }
     }
-    this.ctx.putImageData(this.img, 0, 0); this.version++;
+    this.relight(0, 0, W - 1, H - 1);
+  },
+  // Bake lighting for a rectangle (expanded by the light reach) from `base` into `buf`, then push it to the canvas.
+  // Distances to air are found with run-length passes, so the cost is linear in the area.
+  relight(x0, y0, x1, y1) {
+    const W = this.W, H = this.H, m = this.mask, base = this.base, buf = this.buf, N = 6;
+    x0 = Math.max(0, Math.floor(x0) - N); y0 = Math.max(0, Math.floor(y0) - N); x1 = Math.min(W - 1, Math.ceil(x1) + N); y1 = Math.min(H - 1, Math.ceil(y1) + N);
+    if (x1 < x0 || y1 < y0) return;
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, n = w * h;
+    const dT = new Uint8Array(n), dB = new Uint8Array(n), dL = new Uint8Array(n), dR = new Uint8Array(n);
+    for (let x = 0; x < w; x++) {
+      let run = 0; for (let y = 0; y < h; y++) { const k = y * w + x; run = m[(y0 + y) * W + x0 + x] ? Math.min(N + 1, run + 1) : 0; dT[k] = run; }
+      run = 0; for (let y = h - 1; y >= 0; y--) { const k = y * w + x; run = m[(y0 + y) * W + x0 + x] ? Math.min(N + 1, run + 1) : 0; dB[k] = run; }
+    }
+    for (let y = 0; y < h; y++) {
+      const row = (y0 + y) * W + x0; let run = 0;
+      for (let x = 0; x < w; x++) { run = m[row + x] ? Math.min(N + 1, run + 1) : 0; dL[y * w + x] = run; }
+      run = 0; for (let x = w - 1; x >= 0; x--) { run = m[row + x] ? Math.min(N + 1, run + 1) : 0; dR[y * w + x] = run; }
+    }
+    // light from the top-left: rim light near air above/left, shadow near air below/right (index = distance to air)
+    const LT = [0, 0.5, 0.3, 0.16, 0.07, 0.02, 0, 0], LL = [0, 0.16, 0.09, 0.04, 0.01, 0, 0, 0], LB = [0, -0.42, -0.3, -0.18, -0.08, -0.02, 0, 0], LR = [0, -0.14, -0.08, -0.03, 0, 0, 0, 0];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x, i = (y0 + y) * W + x0 + x;
+      if (!m[i]) { buf[i] = 0; continue; }
+      const c = base[i]; let r = c & 255, g = (c >> 8) & 255, b = (c >> 16) & 255;
+      const lit = LT[dT[k]] + LL[dL[k]], dark = LB[dB[k]] + LR[dR[k]];
+      if (lit > 0) { r += (255 - r) * lit; g += (250 - g) * lit; b += (225 - b) * lit; }
+      if (dark < 0) { const f = 1 + dark; r *= f; g *= f; b *= f * 1.05; }
+      buf[i] = (255 << 24) | (clamp(b | 0, 0, 255) << 16) | (clamp(g | 0, 0, 255) << 8) | clamp(r | 0, 0, 255);
+    }
+    this.flush(x0, y0, x1, y1);
   },
   colorAt(x, y, down, up) {
     const h = hash2(x, y), j = (h - 0.5) * 18, th = this.theme;
@@ -159,7 +191,7 @@ const Terrain = {
     if (x1 >= x0 && y1 >= y0) { this.ctx.putImageData(this.img, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1); this.version++; }
   },
   carve(cx, cy, r, char = true) {
-    const W = this.W, H = this.H, m = this.mask, buf = this.buf;
+    const W = this.W, H = this.H, m = this.mask, base = this.base;
     const rim = char ? 6 : 0, R = r + rim;
     const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
     const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
@@ -170,15 +202,15 @@ const Terrain = {
       for (let x = x0; x <= x1; x++) {
         const dx = x - cx, d2 = dx * dx + dy * dy; if (d2 > R2) continue;
         const i = y * W + x; if (!m[i]) continue;
-        if (d2 < r2) { m[i] = 0; buf[i] = 0; }
+        if (d2 < r2) { m[i] = 0; base[i] = 0; }
         else { // charred rim: blend toward soot, strongest at the crater edge
-          const k = 0.6 * (1 - (Math.sqrt(d2) - r) / rim), c = buf[i];
+          const k = 0.6 * (1 - (Math.sqrt(d2) - r) / rim), c = base[i];
           const rr = c & 255, gg = (c >> 8) & 255, bb = (c >> 16) & 255;
-          buf[i] = (255 << 24) | ((bb + (22 - bb) * k) << 16) | ((gg + (20 - gg) * k) << 8) | (rr + (28 - rr) * k);
+          base[i] = (255 << 24) | ((bb + (22 - bb) * k) << 16) | ((gg + (20 - gg) * k) << 8) | (rr + (28 - rr) * k);
         }
       }
     }
-    this.flush(x0, y0, x1, y1);
+    this.relight(x0, y0, x1, y1);
   },
   // Stamp a rotated steel plank into the bitmap
   girder(cx, cy, ang, len = 80, th = 8) {
@@ -192,9 +224,9 @@ const Terrain = {
       if (Math.abs(v) > ht - 1.6 || Math.abs(u) > hl - 1.6) { r = 150; g = 70; b = 22; }
       else if (((u + hl) % 16) > 6 && ((u + hl) % 16) < 10 && Math.abs(v) < 1.8) { r = 120; g = 52; b = 16; }
       else if (v < -1) { r = 255; g = 168; b = 80; }
-      this.buf[i] = (255 << 24) | (b << 16) | (g << 8) | r;
+      this.base[i] = (255 << 24) | (b << 16) | (g << 8) | r;
     }
-    this.flush(cx - ext, cy - ext, cx + ext, cy + ext);
+    this.relight(cx - ext, cy - ext, cx + ext, cy + ext);
   },
 };
 

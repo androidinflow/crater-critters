@@ -4,6 +4,18 @@ const ctx = canvas.getContext('2d');
 const view = { w: 0, h: 0, dpr: 1 };
 const cam = { x: CFG.W / 2, y: 600, zoom: 0.8, tz: 0.8, manualT: 0 };
 let bg = null;
+let shadowCvs = null, shadowCtx = null;   // screen-sized scratch layer for the terrain's drop shadow
+// The land casts a soft shadow onto the water and hills behind it (a diorama-like depth cue):
+// blit the visible terrain into a scratch canvas, turn it into a silhouette, draw it offset and faint.
+function drawTerrainShadow(sx, sy, ex, ey) {
+  if (!shadowCvs) { shadowCvs = document.createElement('canvas'); shadowCtx = shadowCvs.getContext('2d'); }
+  if (shadowCvs.width !== canvas.width || shadowCvs.height !== canvas.height) { shadowCvs.width = canvas.width; shadowCvs.height = canvas.height; }
+  const S = shadowCtx, T = ctx.getTransform();
+  S.setTransform(1, 0, 0, 1, 0, 0); S.globalCompositeOperation = 'source-over'; S.clearRect(0, 0, shadowCvs.width, shadowCvs.height);
+  S.setTransform(T); S.drawImage(Terrain.cvs, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy);
+  S.setTransform(1, 0, 0, 1, 0, 0); S.globalCompositeOperation = 'source-in'; S.fillStyle = '#0a1020'; S.fillRect(0, 0, shadowCvs.width, shadowCvs.height);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.28; ctx.drawImage(shadowCvs, 7 * cam.zoom * view.dpr, 11 * cam.zoom * view.dpr); ctx.restore();
+}
 function resize() {
   view.dpr = Math.min(window.devicePixelRatio || 1, 2);
   view.w = window.innerWidth; view.h = window.innerHeight;
@@ -134,7 +146,13 @@ function drawWater(front, vx0, vx1, vy1) {
     const gr = ctx.createLinearGradient(0, g.waterY, 0, g.waterY + 200), wc = Terrain.theme.water;
     gr.addColorStop(0, wc[1]); gr.addColorStop(1, wc[2]);
     waterPath(vx0, vx1, yb, 4, 0); ctx.fillStyle = gr; ctx.fill();
+    // sky reflection just below the surface, then two glints riding the swell
+    const rf = ctx.createLinearGradient(0, g.waterY, 0, g.waterY + 46); rf.addColorStop(0, 'rgba(255,255,255,0.22)'); rf.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = rf; ctx.fill();
     ctx.strokeStyle = Terrain.theme.foam; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1.2;
+    for (const [off, ph, amp] of [[9, 0.9, 3], [19, 2.2, 2]]) {
+      ctx.beginPath(); for (let x = vx0; x <= vx1 + 16; x += 16) { const y = g.waterY + off + Math.sin(x * 0.02 + g.time * 1.6 + ph) * amp; if (x === vx0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke();
+    }
   }
 }
 
@@ -148,6 +166,10 @@ function drawCritter(x, c, t) {
   const ruffle = idle > 3 && (idle - 3) % 8 < 0.45 ? Math.sin((idle - 3) % 8 / 0.45 * Math.PI * 4) * 0.14 : 0; // quill shake
   const blink = c.blinkT >= 0 && c.blinkT < 0.16 ? Math.sin(c.blinkT / 0.16 * Math.PI) : 0;
   x.save(); x.translate(c.x, c.y);
+  { // contact shadow on the ground below (shrinks and fades with height)
+    let gy = r + 1; if (c.mode !== 'ground') { gy = r; while (gy < 220 && !Terrain.solid(c.x, c.y + gy)) gy += 4; }
+    if (gy < 220) { const k = 1 - (gy - r) / 220; x.fillStyle = `rgba(0,0,0,${0.26 * k})`; x.beginPath(); x.ellipse(2, gy, r * 1.15 * (0.5 + 0.5 * k), r * 0.3 * (0.5 + 0.5 * k), 0, 0, 7); x.fill(); }
+  }
   if (c.dyingT > 0) x.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 20));
   const br = Math.sin(t * 3 + c.seed) * 0.03, sq = c.squash + br - yawn * 0.06;
   // walk: bob up on each step, squash a little on footfall
@@ -161,7 +183,10 @@ function drawCritter(x, c, t) {
   x.rotate(wk * (c.blocked ? 0.3 : 0.13) + (idle > 1 ? Math.sin(t * 1.4 + c.seed) * 0.025 : 0) + yawn * -0.08);
   const scared = c.dyingT <= 0 && c.faceT <= 0 && (c.tumble || (c.mode === 'air' && c.vy > 330));
   // --- penguin: dark coat, white front, two flippers, orange beak and feet ---
-  const coat = '#262a3a', coatLine = '#121420', front = c.face === 4 && c.faceT > 0 ? '#d9e6bd' : '#f6f2e8';
+  const coatLine = '#121420', front = c.face === 4 && c.faceT > 0 ? '#d9e6bd' : '#f6f2e8';
+  // a lit, rounded coat: highlight up-left, shadow down-right
+  const coat = x.createRadialGradient(-r * 0.35, -r * 0.6, r * 0.15, 0, 0, r * 1.35); coat.addColorStop(0, '#454c66'); coat.addColorStop(0.55, '#2a2f42'); coat.addColorStop(1, '#171a28');
+  const frontG = x.createLinearGradient(0, -r, 0, r); frontG.addColorStop(0, front); frontG.addColorStop(1, c.face === 4 && c.faceT > 0 ? '#bfcf9f' : '#dcd6c8');
   // flipper angle: swings with the walk, flaps when startled or airborne, waves a little when bored
   const flap = Math.sin(ph) * 0.5 * wk + (idle > 1 ? Math.sin(t * 1.7 + c.seed) * 0.05 : 0) + ruffle * 1.5 + (c.hurtT > 0 || scared ? 0.9 : 0) + (c.mode === 'air' && !c.tumble ? 0.6 : 0) + yawn * 0.4;
   // far flipper (behind the body)
@@ -175,8 +200,8 @@ function drawCritter(x, c, t) {
   // body: an egg, a little taller than it is wide
   x.fillStyle = coat; x.strokeStyle = coatLine; x.lineWidth = 1.4; x.beginPath(); x.ellipse(0, -r * 0.08, r * 0.98, r * 1.12, 0, 0, 7); x.fill(); x.stroke();
   // white front and face patch
-  x.fillStyle = front; x.beginPath(); x.ellipse(r * 0.18, r * 0.24, r * 0.6, r * 0.72, 0, 0, 7); x.fill();
-  x.beginPath(); x.ellipse(r * 0.42, -r * 0.42, r * 0.5, r * 0.46, 0, 0, 7); x.fill();
+  x.fillStyle = frontG; x.beginPath(); x.ellipse(r * 0.18, r * 0.24, r * 0.6, r * 0.72, 0, 0, 7); x.fill();
+  x.fillStyle = front; x.beginPath(); x.ellipse(r * 0.42, -r * 0.42, r * 0.5, r * 0.46, 0, 0, 7); x.fill();
   // soot smudges when burnt
   if (c.face === 3 && c.faceT > 0) { x.fillStyle = 'rgba(40,30,25,0.5)'; x.beginPath(); x.ellipse(r * 0.25, r * 0.4, 2.6, 1.5, 0.4, 0, 7); x.fill(); x.beginPath(); x.ellipse(r * 0.6, -r * 0.2, 2, 1.3, -0.5, 0, 7); x.fill(); }
   // near flipper
@@ -268,6 +293,7 @@ const ANIMAL_ICON = { robot: 'robot', cow: 'cows', granny: 'granny', rhino: 'rhi
 function drawEntity(x, e, t) {
   if (e instanceof Critter) return; // drawn in a separate pass
   x.save(); x.translate(e.x, e.y);
+  if (e.rest && e.r && !(e instanceof GasPuff) && !(e instanceof Lava)) { x.fillStyle = 'rgba(0,0,0,0.22)'; x.beginPath(); x.ellipse(1, e.r * 0.95, e.r * 1.25, e.r * 0.36, 0, 0, 7); x.fill(); }
   if (e instanceof Proj) {
     const ty = e.type;
     if (ty === 'rocket') { x.rotate(Math.atan2(e.vy, e.vx)); drawIcon(x, 'rocket', 16); }
@@ -476,7 +502,7 @@ function render() {
   drawWater(false, vx0, vx1, vy1);
   // terrain: blit only the visible part of the bitmap
   const sx = clamp(Math.floor(vx0), 0, CFG.W), sy = clamp(Math.floor(vy0), 0, CFG.H), ex = clamp(Math.ceil(vx1), 0, CFG.W), ey = clamp(Math.ceil(vy1), 0, CFG.H);
-  if (ex > sx && ey > sy) ctx.drawImage(Terrain.cvs, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy);
+  if (ex > sx && ey > sy) { drawTerrainShadow(sx, sy, ex, ey); ctx.drawImage(Terrain.cvs, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy); }
   drawDecor(ctx, vx0, vx1);
   for (const e of g.ents) drawEntity(ctx, e, g.time);
   for (const c of g.critters) if (c.alive) drawCritter(ctx, c, g.time);
@@ -487,6 +513,9 @@ function render() {
   drawTargets(ctx);
   drawWater(true, vx0, vx1, vy1);
   ctx.restore();
+  // vignette: a quiet darkening of the corners that pulls the eye to the middle of the scene
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.85);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(5,8,20,0.38)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
   if (g.state !== 'menu') drawHUD();
 }
 

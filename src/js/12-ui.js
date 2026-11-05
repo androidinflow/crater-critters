@@ -210,7 +210,7 @@ const MapImage = {
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
       const i = (yy * w + xx) * 4;
       if (d[i + 3] <= 127 || (whiteIsAir && d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235)) continue;
-      const j = (y0 + yy) * W + (x0 + xx); T.mask[j] = 1; T.buf[j] = (255 << 24) | (d[i + 2] << 16) | (d[i + 1] << 8) | d[i];
+      const j = (y0 + yy) * W + (x0 + xx); T.mask[j] = 1; T.base[j] = (255 << 24) | (d[i + 2] << 16) | (d[i + 1] << 8) | d[i];
     }
   },
 };

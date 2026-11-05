@@ -690,13 +690,15 @@ const Sfx = {
 };
 
 // ============================== TERRAIN ==============================
-// The landscape is a W×H bitmap: `mask` (1 = solid) for collision and an RGBA buffer
-// (`buf`, a Uint32 view over ImageData) for drawing. Explosions edit both and push
-// only the dirty rectangle to the terrain canvas.
+// The landscape is a W×H bitmap: `mask` (1 = solid) for collision, `base` (unlit colours)
+// and `buf` (lit colours, a Uint32 view over ImageData) for drawing. A light from the
+// top-left is baked in by `relight`: pixels a few px from air above/left brighten, pixels
+// near air below/right darken, which gives the flat bitmap edges, rims and undersides.
+// Explosions edit mask + base, relight the dirty rectangle and push only that to the canvas.
 const Terrain = {
   W: CFG.W, H: CFG.H, mask: null, buf: null, img: null, cvs: null, ctx: null, cavern: false, ceilArr: null, style: 'Island', theme: THEMES.Meadow, themeName: 'Meadow', decor: [], version: 0,
   init() {
-    this.mask = new Uint8Array(this.W * this.H);
+    this.mask = new Uint8Array(this.W * this.H); this.base = new Uint32Array(this.W * this.H);
     this.cvs = document.createElement('canvas'); this.cvs.width = this.W; this.cvs.height = this.H;
     this.ctx = this.cvs.getContext('2d');
     this.img = this.ctx.createImageData(this.W, this.H);
@@ -713,8 +715,8 @@ const Terrain = {
     this.themeName = THEMES[themeName] ? themeName : 'Meadow'; this.theme = THEMES[this.themeName];
     m.fill(0);
     if (style === 'Custom') {   // beta: the player's own image, stamped above the water line
-      this.buf.fill(0); this.ceilArr = new Float32Array(W).fill(-1);
-      MapImage.stamp(this); this.decorate(rng, this.ceilArr); this.ctx.putImageData(this.img, 0, 0); this.version++; return;
+      this.base.fill(0); this.ceilArr = new Float32Array(W).fill(-1);
+      MapImage.stamp(this); this.decorate(rng, this.ceilArr); this.paintAll(true); return;
     }
     const nA = noise1(rng), nB = noise1(rng), nC = noise1(rng), n2 = noise2(rng);
     const water = CFG.WATER0;
@@ -811,19 +813,49 @@ const Terrain = {
   },
   // Colour every solid pixel based on its vertical depth below the surface (grass → dirt strata)
   // and its height above an underside (roots / cave rock).
-  paintAll() {
-    const W = this.W, H = this.H, m = this.mask, buf = this.buf, up = new Uint16Array(H);
-    for (let x = 0; x < W; x++) {
+  paintAll(custom = false) {
+    const W = this.W, H = this.H, m = this.mask, base = this.base, up = new Uint16Array(H);
+    if (!custom) for (let x = 0; x < W; x++) {
       let run = 0;
       for (let y = H - 1; y >= 0; y--) { if (m[y * W + x]) { run++; up[y] = run; } else run = 0; }
       let down = 0;
       for (let y = 0; y < H; y++) {
         const i = y * W + x;
-        if (!m[i]) { down = 0; buf[i] = 0; continue; }
-        down++; buf[i] = this.colorAt(x, y, down, up[y]);
+        if (!m[i]) { down = 0; base[i] = 0; continue; }
+        down++; base[i] = this.colorAt(x, y, down, up[y]);
       }
     }
-    this.ctx.putImageData(this.img, 0, 0); this.version++;
+    this.relight(0, 0, W - 1, H - 1);
+  },
+  // Bake lighting for a rectangle (expanded by the light reach) from `base` into `buf`, then push it to the canvas.
+  // Distances to air are found with run-length passes, so the cost is linear in the area.
+  relight(x0, y0, x1, y1) {
+    const W = this.W, H = this.H, m = this.mask, base = this.base, buf = this.buf, N = 6;
+    x0 = Math.max(0, Math.floor(x0) - N); y0 = Math.max(0, Math.floor(y0) - N); x1 = Math.min(W - 1, Math.ceil(x1) + N); y1 = Math.min(H - 1, Math.ceil(y1) + N);
+    if (x1 < x0 || y1 < y0) return;
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, n = w * h;
+    const dT = new Uint8Array(n), dB = new Uint8Array(n), dL = new Uint8Array(n), dR = new Uint8Array(n);
+    for (let x = 0; x < w; x++) {
+      let run = 0; for (let y = 0; y < h; y++) { const k = y * w + x; run = m[(y0 + y) * W + x0 + x] ? Math.min(N + 1, run + 1) : 0; dT[k] = run; }
+      run = 0; for (let y = h - 1; y >= 0; y--) { const k = y * w + x; run = m[(y0 + y) * W + x0 + x] ? Math.min(N + 1, run + 1) : 0; dB[k] = run; }
+    }
+    for (let y = 0; y < h; y++) {
+      const row = (y0 + y) * W + x0; let run = 0;
+      for (let x = 0; x < w; x++) { run = m[row + x] ? Math.min(N + 1, run + 1) : 0; dL[y * w + x] = run; }
+      run = 0; for (let x = w - 1; x >= 0; x--) { run = m[row + x] ? Math.min(N + 1, run + 1) : 0; dR[y * w + x] = run; }
+    }
+    // light from the top-left: rim light near air above/left, shadow near air below/right (index = distance to air)
+    const LT = [0, 0.5, 0.3, 0.16, 0.07, 0.02, 0, 0], LL = [0, 0.16, 0.09, 0.04, 0.01, 0, 0, 0], LB = [0, -0.42, -0.3, -0.18, -0.08, -0.02, 0, 0], LR = [0, -0.14, -0.08, -0.03, 0, 0, 0, 0];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x, i = (y0 + y) * W + x0 + x;
+      if (!m[i]) { buf[i] = 0; continue; }
+      const c = base[i]; let r = c & 255, g = (c >> 8) & 255, b = (c >> 16) & 255;
+      const lit = LT[dT[k]] + LL[dL[k]], dark = LB[dB[k]] + LR[dR[k]];
+      if (lit > 0) { r += (255 - r) * lit; g += (250 - g) * lit; b += (225 - b) * lit; }
+      if (dark < 0) { const f = 1 + dark; r *= f; g *= f; b *= f * 1.05; }
+      buf[i] = (255 << 24) | (clamp(b | 0, 0, 255) << 16) | (clamp(g | 0, 0, 255) << 8) | clamp(r | 0, 0, 255);
+    }
+    this.flush(x0, y0, x1, y1);
   },
   colorAt(x, y, down, up) {
     const h = hash2(x, y), j = (h - 0.5) * 18, th = this.theme;
@@ -850,7 +882,7 @@ const Terrain = {
     if (x1 >= x0 && y1 >= y0) { this.ctx.putImageData(this.img, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1); this.version++; }
   },
   carve(cx, cy, r, char = true) {
-    const W = this.W, H = this.H, m = this.mask, buf = this.buf;
+    const W = this.W, H = this.H, m = this.mask, base = this.base;
     const rim = char ? 6 : 0, R = r + rim;
     const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(W - 1, Math.ceil(cx + R));
     const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(H - 1, Math.ceil(cy + R));
@@ -861,15 +893,15 @@ const Terrain = {
       for (let x = x0; x <= x1; x++) {
         const dx = x - cx, d2 = dx * dx + dy * dy; if (d2 > R2) continue;
         const i = y * W + x; if (!m[i]) continue;
-        if (d2 < r2) { m[i] = 0; buf[i] = 0; }
+        if (d2 < r2) { m[i] = 0; base[i] = 0; }
         else { // charred rim: blend toward soot, strongest at the crater edge
-          const k = 0.6 * (1 - (Math.sqrt(d2) - r) / rim), c = buf[i];
+          const k = 0.6 * (1 - (Math.sqrt(d2) - r) / rim), c = base[i];
           const rr = c & 255, gg = (c >> 8) & 255, bb = (c >> 16) & 255;
-          buf[i] = (255 << 24) | ((bb + (22 - bb) * k) << 16) | ((gg + (20 - gg) * k) << 8) | (rr + (28 - rr) * k);
+          base[i] = (255 << 24) | ((bb + (22 - bb) * k) << 16) | ((gg + (20 - gg) * k) << 8) | (rr + (28 - rr) * k);
         }
       }
     }
-    this.flush(x0, y0, x1, y1);
+    this.relight(x0, y0, x1, y1);
   },
   // Stamp a rotated steel plank into the bitmap
   girder(cx, cy, ang, len = 80, th = 8) {
@@ -883,9 +915,9 @@ const Terrain = {
       if (Math.abs(v) > ht - 1.6 || Math.abs(u) > hl - 1.6) { r = 150; g = 70; b = 22; }
       else if (((u + hl) % 16) > 6 && ((u + hl) % 16) < 10 && Math.abs(v) < 1.8) { r = 120; g = 52; b = 16; }
       else if (v < -1) { r = 255; g = 168; b = 80; }
-      this.buf[i] = (255 << 24) | (b << 16) | (g << 8) | r;
+      this.base[i] = (255 << 24) | (b << 16) | (g << 8) | r;
     }
-    this.flush(cx - ext, cy - ext, cx + ext, cy + ext);
+    this.relight(cx - ext, cy - ext, cx + ext, cy + ext);
   },
 };
 
@@ -3193,6 +3225,18 @@ const ctx = canvas.getContext('2d');
 const view = { w: 0, h: 0, dpr: 1 };
 const cam = { x: CFG.W / 2, y: 600, zoom: 0.8, tz: 0.8, manualT: 0 };
 let bg = null;
+let shadowCvs = null, shadowCtx = null;   // screen-sized scratch layer for the terrain's drop shadow
+// The land casts a soft shadow onto the water and hills behind it (a diorama-like depth cue):
+// blit the visible terrain into a scratch canvas, turn it into a silhouette, draw it offset and faint.
+function drawTerrainShadow(sx, sy, ex, ey) {
+  if (!shadowCvs) { shadowCvs = document.createElement('canvas'); shadowCtx = shadowCvs.getContext('2d'); }
+  if (shadowCvs.width !== canvas.width || shadowCvs.height !== canvas.height) { shadowCvs.width = canvas.width; shadowCvs.height = canvas.height; }
+  const S = shadowCtx, T = ctx.getTransform();
+  S.setTransform(1, 0, 0, 1, 0, 0); S.globalCompositeOperation = 'source-over'; S.clearRect(0, 0, shadowCvs.width, shadowCvs.height);
+  S.setTransform(T); S.drawImage(Terrain.cvs, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy);
+  S.setTransform(1, 0, 0, 1, 0, 0); S.globalCompositeOperation = 'source-in'; S.fillStyle = '#0a1020'; S.fillRect(0, 0, shadowCvs.width, shadowCvs.height);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.28; ctx.drawImage(shadowCvs, 7 * cam.zoom * view.dpr, 11 * cam.zoom * view.dpr); ctx.restore();
+}
 function resize() {
   view.dpr = Math.min(window.devicePixelRatio || 1, 2);
   view.w = window.innerWidth; view.h = window.innerHeight;
@@ -3323,7 +3367,13 @@ function drawWater(front, vx0, vx1, vy1) {
     const gr = ctx.createLinearGradient(0, g.waterY, 0, g.waterY + 200), wc = Terrain.theme.water;
     gr.addColorStop(0, wc[1]); gr.addColorStop(1, wc[2]);
     waterPath(vx0, vx1, yb, 4, 0); ctx.fillStyle = gr; ctx.fill();
+    // sky reflection just below the surface, then two glints riding the swell
+    const rf = ctx.createLinearGradient(0, g.waterY, 0, g.waterY + 46); rf.addColorStop(0, 'rgba(255,255,255,0.22)'); rf.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = rf; ctx.fill();
     ctx.strokeStyle = Terrain.theme.foam; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1.2;
+    for (const [off, ph, amp] of [[9, 0.9, 3], [19, 2.2, 2]]) {
+      ctx.beginPath(); for (let x = vx0; x <= vx1 + 16; x += 16) { const y = g.waterY + off + Math.sin(x * 0.02 + g.time * 1.6 + ph) * amp; if (x === vx0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke();
+    }
   }
 }
 
@@ -3337,6 +3387,10 @@ function drawCritter(x, c, t) {
   const ruffle = idle > 3 && (idle - 3) % 8 < 0.45 ? Math.sin((idle - 3) % 8 / 0.45 * Math.PI * 4) * 0.14 : 0; // quill shake
   const blink = c.blinkT >= 0 && c.blinkT < 0.16 ? Math.sin(c.blinkT / 0.16 * Math.PI) : 0;
   x.save(); x.translate(c.x, c.y);
+  { // contact shadow on the ground below (shrinks and fades with height)
+    let gy = r + 1; if (c.mode !== 'ground') { gy = r; while (gy < 220 && !Terrain.solid(c.x, c.y + gy)) gy += 4; }
+    if (gy < 220) { const k = 1 - (gy - r) / 220; x.fillStyle = `rgba(0,0,0,${0.26 * k})`; x.beginPath(); x.ellipse(2, gy, r * 1.15 * (0.5 + 0.5 * k), r * 0.3 * (0.5 + 0.5 * k), 0, 0, 7); x.fill(); }
+  }
   if (c.dyingT > 0) x.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(t * 20));
   const br = Math.sin(t * 3 + c.seed) * 0.03, sq = c.squash + br - yawn * 0.06;
   // walk: bob up on each step, squash a little on footfall
@@ -3350,7 +3404,10 @@ function drawCritter(x, c, t) {
   x.rotate(wk * (c.blocked ? 0.3 : 0.13) + (idle > 1 ? Math.sin(t * 1.4 + c.seed) * 0.025 : 0) + yawn * -0.08);
   const scared = c.dyingT <= 0 && c.faceT <= 0 && (c.tumble || (c.mode === 'air' && c.vy > 330));
   // --- penguin: dark coat, white front, two flippers, orange beak and feet ---
-  const coat = '#262a3a', coatLine = '#121420', front = c.face === 4 && c.faceT > 0 ? '#d9e6bd' : '#f6f2e8';
+  const coatLine = '#121420', front = c.face === 4 && c.faceT > 0 ? '#d9e6bd' : '#f6f2e8';
+  // a lit, rounded coat: highlight up-left, shadow down-right
+  const coat = x.createRadialGradient(-r * 0.35, -r * 0.6, r * 0.15, 0, 0, r * 1.35); coat.addColorStop(0, '#454c66'); coat.addColorStop(0.55, '#2a2f42'); coat.addColorStop(1, '#171a28');
+  const frontG = x.createLinearGradient(0, -r, 0, r); frontG.addColorStop(0, front); frontG.addColorStop(1, c.face === 4 && c.faceT > 0 ? '#bfcf9f' : '#dcd6c8');
   // flipper angle: swings with the walk, flaps when startled or airborne, waves a little when bored
   const flap = Math.sin(ph) * 0.5 * wk + (idle > 1 ? Math.sin(t * 1.7 + c.seed) * 0.05 : 0) + ruffle * 1.5 + (c.hurtT > 0 || scared ? 0.9 : 0) + (c.mode === 'air' && !c.tumble ? 0.6 : 0) + yawn * 0.4;
   // far flipper (behind the body)
@@ -3364,8 +3421,8 @@ function drawCritter(x, c, t) {
   // body: an egg, a little taller than it is wide
   x.fillStyle = coat; x.strokeStyle = coatLine; x.lineWidth = 1.4; x.beginPath(); x.ellipse(0, -r * 0.08, r * 0.98, r * 1.12, 0, 0, 7); x.fill(); x.stroke();
   // white front and face patch
-  x.fillStyle = front; x.beginPath(); x.ellipse(r * 0.18, r * 0.24, r * 0.6, r * 0.72, 0, 0, 7); x.fill();
-  x.beginPath(); x.ellipse(r * 0.42, -r * 0.42, r * 0.5, r * 0.46, 0, 0, 7); x.fill();
+  x.fillStyle = frontG; x.beginPath(); x.ellipse(r * 0.18, r * 0.24, r * 0.6, r * 0.72, 0, 0, 7); x.fill();
+  x.fillStyle = front; x.beginPath(); x.ellipse(r * 0.42, -r * 0.42, r * 0.5, r * 0.46, 0, 0, 7); x.fill();
   // soot smudges when burnt
   if (c.face === 3 && c.faceT > 0) { x.fillStyle = 'rgba(40,30,25,0.5)'; x.beginPath(); x.ellipse(r * 0.25, r * 0.4, 2.6, 1.5, 0.4, 0, 7); x.fill(); x.beginPath(); x.ellipse(r * 0.6, -r * 0.2, 2, 1.3, -0.5, 0, 7); x.fill(); }
   // near flipper
@@ -3457,6 +3514,7 @@ const ANIMAL_ICON = { robot: 'robot', cow: 'cows', granny: 'granny', rhino: 'rhi
 function drawEntity(x, e, t) {
   if (e instanceof Critter) return; // drawn in a separate pass
   x.save(); x.translate(e.x, e.y);
+  if (e.rest && e.r && !(e instanceof GasPuff) && !(e instanceof Lava)) { x.fillStyle = 'rgba(0,0,0,0.22)'; x.beginPath(); x.ellipse(1, e.r * 0.95, e.r * 1.25, e.r * 0.36, 0, 0, 7); x.fill(); }
   if (e instanceof Proj) {
     const ty = e.type;
     if (ty === 'rocket') { x.rotate(Math.atan2(e.vy, e.vx)); drawIcon(x, 'rocket', 16); }
@@ -3665,7 +3723,7 @@ function render() {
   drawWater(false, vx0, vx1, vy1);
   // terrain: blit only the visible part of the bitmap
   const sx = clamp(Math.floor(vx0), 0, CFG.W), sy = clamp(Math.floor(vy0), 0, CFG.H), ex = clamp(Math.ceil(vx1), 0, CFG.W), ey = clamp(Math.ceil(vy1), 0, CFG.H);
-  if (ex > sx && ey > sy) ctx.drawImage(Terrain.cvs, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy);
+  if (ex > sx && ey > sy) { drawTerrainShadow(sx, sy, ex, ey); ctx.drawImage(Terrain.cvs, sx, sy, ex - sx, ey - sy, sx, sy, ex - sx, ey - sy); }
   drawDecor(ctx, vx0, vx1);
   for (const e of g.ents) drawEntity(ctx, e, g.time);
   for (const c of g.critters) if (c.alive) drawCritter(ctx, c, g.time);
@@ -3676,6 +3734,9 @@ function render() {
   drawTargets(ctx);
   drawWater(true, vx0, vx1, vy1);
   ctx.restore();
+  // vignette: a quiet darkening of the corners that pulls the eye to the middle of the scene
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.85);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(5,8,20,0.38)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
   if (g.state !== 'menu') drawHUD();
 }
 
@@ -3891,7 +3952,7 @@ const MapImage = {
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
       const i = (yy * w + xx) * 4;
       if (d[i + 3] <= 127 || (whiteIsAir && d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235)) continue;
-      const j = (y0 + yy) * W + (x0 + xx); T.mask[j] = 1; T.buf[j] = (255 << 24) | (d[i + 2] << 16) | (d[i + 1] << 8) | d[i];
+      const j = (y0 + yy) * W + (x0 + xx); T.mask[j] = 1; T.base[j] = (255 << 24) | (d[i + 2] << 16) | (d[i + 1] << 8) | d[i];
     }
   },
 };
