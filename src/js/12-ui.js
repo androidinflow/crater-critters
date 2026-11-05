@@ -185,6 +185,14 @@ const MapImage = {
     const url = cv.toDataURL('image/png'); try { localStorage.setItem(this.KEY, url); } catch (e) { }
     this.setSrc(url, () => { this.thumb(); if (g.state === 'menu') startBackdrop(); });
   },
+  // Turn the stored image a quarter turn (dir = 1 clockwise, -1 anticlockwise); width and height swap
+  rotate(dir) {
+    if (!this.ready()) return;
+    const im = this.img, cv = document.createElement('canvas'); cv.width = im.naturalHeight; cv.height = im.naturalWidth; const x = cv.getContext('2d');
+    x.translate(cv.width / 2, cv.height / 2); x.rotate(dir * Math.PI / 2); x.drawImage(im, -im.naturalWidth / 2, -im.naturalHeight / 2);
+    const url = cv.toDataURL('image/png'); try { localStorage.setItem(this.KEY, url); } catch (e) { }
+    this.setSrc(url, () => { this.thumb(); if (g.state === 'menu') startBackdrop(); });
+  },
   thumb() {
     const cv = $('mapThumb'); if (!cv) return; const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height);
     if (!this.ready()) return;
@@ -243,7 +251,7 @@ const UI = {
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('scheme', 'scheme');
     bindSel('mapStyle', 'map', false, () => { this.buildMenu(); startBackdrop(); }); bindSel('theme', 'theme', false, startBackdrop);
     $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
-    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Custom maps work in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); $('mapFlipH').disabled = $('mapFlipV').disabled = !MapImage.ready(); }
+    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Custom maps work in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); $('mapFlipH').disabled = $('mapFlipV').disabled = $('mapRotL').disabled = $('mapRotR').disabled = !MapImage.ready(); }
     else $('mapNote').textContent = 'The backdrop previews your map and theme.';
   },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
@@ -320,6 +328,8 @@ $('mapFile').onchange = e => { const f = e.target.files && e.target.files[0]; if
 $('mapPick').onclick = () => $('mapFile').click();
 $('mapFlipH').onclick = () => MapImage.flip('h');
 $('mapFlipV').onclick = () => MapImage.flip('v');
+$('mapRotL').onclick = () => MapImage.rotate(-1);
+$('mapRotR').onclick = () => MapImage.rotate(1);
 $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
 $('pauseHelpBtn').onclick = () => UI.toggleHelp();

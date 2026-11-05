@@ -69,6 +69,7 @@
   .field select{width:100%}
   .imgtools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .imgtools button{padding:0 10px;height:32px;font-size:13px}
+  .imgtools button.ghost{padding:0 8px;font-size:16px;min-width:32px}
   #mapThumb{width:72px;height:36px;border:2px solid var(--line2);border-radius:6px;background:
     repeating-conic-gradient(rgba(43,29,18,.12) 0 25%,transparent 0 50%) 0 0/12px 12px}
   #mapNote{margin:8px 0 0;min-height:1.2em}
@@ -221,7 +222,7 @@
         <div class="field"><label for="mapStyle">Map</label><select id="mapStyle"><option>Island</option><option>Archipelago</option><option>Skylands</option><option>Canyon</option><option>Cavern</option><option>Random</option><option value="Custom">Custom image (beta)</option></select></div>
         <div class="field hidden" id="mapFileRow"><label>Image</label>
           <div class="imgtools"><button type="button" id="mapPick">Choose image</button><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif" hidden>
-            <button type="button" id="mapFlipH" class="ghost" aria-label="Flip horizontally" title="Flip horizontally">⇄</button><button type="button" id="mapFlipV" class="ghost" aria-label="Flip vertically" title="Flip vertically">⇅</button><canvas id="mapThumb" width="144" height="72"></canvas></div></div>
+            <button type="button" id="mapFlipH" class="ghost" aria-label="Flip horizontally" title="Flip horizontally">⇄</button><button type="button" id="mapFlipV" class="ghost" aria-label="Flip vertically" title="Flip vertically">⇅</button><button type="button" id="mapRotL" class="ghost" aria-label="Turn left" title="Turn a quarter left">↺</button><button type="button" id="mapRotR" class="ghost" aria-label="Turn right" title="Turn a quarter right">↻</button><canvas id="mapThumb" width="144" height="72"></canvas></div></div>
         <div class="field"><label for="theme">Theme</label><select id="theme"><option>Meadow</option><option>Snow</option><option>Desert</option><option>Volcanic</option><option>Random</option></select></div>
         <div class="field"><label for="scheme">Scheme</label><select id="scheme"><option>Classic</option><option>Melee Only</option><option>Chaos Crates</option><option>Artillery</option></select></div>
         <div class="field"><label for="turnTime">Turn time</label><select id="turnTime"><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option></select></div>
@@ -3859,6 +3860,14 @@ const MapImage = {
     const url = cv.toDataURL('image/png'); try { localStorage.setItem(this.KEY, url); } catch (e) { }
     this.setSrc(url, () => { this.thumb(); if (g.state === 'menu') startBackdrop(); });
   },
+  // Turn the stored image a quarter turn (dir = 1 clockwise, -1 anticlockwise); width and height swap
+  rotate(dir) {
+    if (!this.ready()) return;
+    const im = this.img, cv = document.createElement('canvas'); cv.width = im.naturalHeight; cv.height = im.naturalWidth; const x = cv.getContext('2d');
+    x.translate(cv.width / 2, cv.height / 2); x.rotate(dir * Math.PI / 2); x.drawImage(im, -im.naturalWidth / 2, -im.naturalHeight / 2);
+    const url = cv.toDataURL('image/png'); try { localStorage.setItem(this.KEY, url); } catch (e) { }
+    this.setSrc(url, () => { this.thumb(); if (g.state === 'menu') startBackdrop(); });
+  },
   thumb() {
     const cv = $('mapThumb'); if (!cv) return; const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height);
     if (!this.ready()) return;
@@ -3917,7 +3926,7 @@ const UI = {
     bindSel('turnTime', 'turnTime', true); bindSel('sdMinutes', 'sdMinutes', true); bindSel('scheme', 'scheme');
     bindSel('mapStyle', 'map', false, () => { this.buildMenu(); startBackdrop(); }); bindSel('theme', 'theme', false, startBackdrop);
     $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
-    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Custom maps work in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); $('mapFlipH').disabled = $('mapFlipV').disabled = !MapImage.ready(); }
+    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Custom maps work in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); $('mapFlipH').disabled = $('mapFlipV').disabled = $('mapRotL').disabled = $('mapRotR').disabled = !MapImage.ready(); }
     else $('mapNote').textContent = 'The backdrop previews your map and theme.';
   },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); this.buildMenu(); startBackdrop(); },
@@ -3994,6 +4003,8 @@ $('mapFile').onchange = e => { const f = e.target.files && e.target.files[0]; if
 $('mapPick').onclick = () => $('mapFile').click();
 $('mapFlipH').onclick = () => MapImage.flip('h');
 $('mapFlipV').onclick = () => MapImage.flip('v');
+$('mapRotL').onclick = () => MapImage.rotate(-1);
+$('mapRotR').onclick = () => MapImage.rotate(1);
 $('helpClose').onclick = () => UI.toggleHelp();
 $('resumeBtn').onclick = () => UI.togglePause();
 $('pauseHelpBtn').onclick = () => UI.toggleHelp();
