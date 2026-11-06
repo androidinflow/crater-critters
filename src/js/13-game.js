@@ -11,7 +11,7 @@ function makeState() {
 function startBackdrop() {
   g = makeState(); const seed = Math.random() * 1e9 | 0;
   Terrain.generate(resolveMap(settings.map), seed, resolveTheme(settings.theme)); bg = makeBackground(seed, Terrain.cavern);
-  cam.x = CFG.W / 2; cam.y = 600; cam.tz = cam.zoom = Math.max(0.45, Math.min(view.w / CFG.W * 1.6, 0.9));
+  cam.x = CFG.W / 2; cam.y = 600; cam.tz = cam.zoom = Math.max(minZoom(), Math.min(view.w / CFG.W * 1.6, 0.9));
 }
 function surfaceSpots() {
   const spots = [];
@@ -46,7 +46,7 @@ function newGame(cfg) {
   for (let i = 0; i < sc.barrels; i++) { const sp = takeSpot(spots, used, 45); spawn(new Barrel(sp.x, sp.y)); }
   g.teamIdx = (Math.random() * g.teams.length | 0) - 1;
   g.state = 'placement'; g.phaseT = 0;
-  cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
+  cam.x = CFG.W / 2; cam.y = 600; cam.tz = fitZoom();
   banner('Critters, assemble!', '#ffd23f');
 }
 function resolveMap(m) { if (m === 'Custom') return !g.online && MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
@@ -266,7 +266,9 @@ function updateCamera(dt) {
     if (t && cam.manualT <= 0 && !Input.drag) { const k = Math.min(1, dt * 3.5); cam.x += (t.x - cam.x) * k; cam.y += (t.y - 40 - cam.y) * k; }
   }
   cam.zoom += (cam.tz - cam.zoom) * Math.min(1, dt * 8);
-  cam.x = clamp(cam.x, -100, CFG.W + 100); cam.y = clamp(cam.y, -300, CFG.H + 50);
+  const hw = view.w / 2 / cam.zoom, hh = view.h / 2 / cam.zoom;
+  cam.x = hw * 2 >= CFG.W + 200 ? CFG.W / 2 : clamp(cam.x, hw - 100, CFG.W + 100 - hw);
+  cam.y = clamp(cam.y, -300, Math.max(-300, CFG.H + 60 - hh));
   g.shake = Math.max(0, g.shake - dt * 30);
 }
 

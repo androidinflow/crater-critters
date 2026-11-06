@@ -50,7 +50,7 @@ function bindPointer(cv) {
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (pts.size >= 2 && pinch) {
       const [p1, p2] = [...pts.values()];
-      cam.tz = cam.zoom = clamp(pinch.z * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinch.d, 0.45, 2.2);
+      cam.tz = cam.zoom = clamp(pinch.z * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinch.d, minZoom(), 2.2);
       cam.x -= dx / 2 / cam.zoom; cam.y -= dy / 2 / cam.zoom; cam.manualT = 3;
       return;
     }
@@ -63,7 +63,7 @@ function bindPointer(cv) {
     pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) Input.drag = false;
   };
   window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', e => { e.preventDefault(); cam.tz = clamp(cam.tz * Math.exp(-e.deltaY * 0.0012), 0.45, 2.2); }, { passive: false });
+  cv.addEventListener('wheel', e => { e.preventDefault(); cam.tz = clamp(cam.tz * Math.exp(-e.deltaY * 0.0012), minZoom(), 2.2); }, { passive: false });
 }
 // On-screen buttons feed the same key table as the keyboard
 function bindTouchButtons() {

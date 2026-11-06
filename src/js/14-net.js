@@ -234,7 +234,7 @@ const Net = {
     this.log = []; applyEvents(m.log);   // the guest keeps the terrain log too, in case it has to host one day
     g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, cIdx: -1, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
     applySnap(m.snap);
-    cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
+    cam.x = CFG.W / 2; cam.y = 600; cam.tz = fitZoom();
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };

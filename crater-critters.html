@@ -161,22 +161,22 @@
   /* ---- touch controls ---- */
   #touch{position:fixed;inset:0;pointer-events:none;z-index:5}
   #touch button{pointer-events:auto;position:absolute;touch-action:none;user-select:none;-webkit-user-select:none;
-    width:62px;height:62px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    width:54px;height:54px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     font-size:10px;font-weight:600;line-height:1;letter-spacing:.2px;color:#fff;background:rgba(15,22,38,.62);box-shadow:0 8px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.18);transition:transform .06s,background .06s}
   #touch button:hover{background:rgba(15,22,38,.62)}
-  #touch button svg{width:24px;height:24px;fill:currentColor;display:block}
+  #touch button svg{width:22px;height:22px;fill:currentColor;display:block}
   #touch button.on{background:rgba(255,255,255,.9);color:#0f1626;transform:scale(.93)}
-  #touch .dpad{position:absolute;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:188px;height:188px}
-  #touch .dpad button svg{width:26px;height:26px}
-  #touch .dpad [data-k=ArrowUp]{left:63px;top:0} #touch .dpad [data-k=ArrowDown]{left:63px;top:126px}
-  #touch .dpad [data-k=ArrowLeft]{left:0;top:63px} #touch .dpad [data-k=ArrowRight]{left:126px;top:63px}
-  #touch .acts{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:188px;height:188px}
-  #touch .acts [data-k=Space]{right:0;bottom:0;width:94px;height:94px;font-size:13px;background:var(--accent);color:var(--accent-ink);border-color:rgba(255,255,255,.35);box-shadow:0 10px 28px rgba(255,123,57,.35)}
-  #touch .acts [data-k=Space] svg{width:36px;height:36px}
+  #touch .dpad{position:absolute;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:162px;height:162px}
+  #touch .dpad button svg{width:24px;height:24px}
+  #touch .dpad [data-k=ArrowUp]{left:54px;top:0} #touch .dpad [data-k=ArrowDown]{left:54px;top:108px}
+  #touch .dpad [data-k=ArrowLeft]{left:0;top:54px} #touch .dpad [data-k=ArrowRight]{left:108px;top:54px}
+  #touch .acts{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:162px;height:162px}
+  #touch .acts [data-k=Space]{right:0;bottom:0;width:82px;height:82px;font-size:13px;background:var(--accent);color:var(--accent-ink);border-color:rgba(255,255,255,.35);box-shadow:0 10px 28px rgba(255,123,57,.35)}
+  #touch .acts [data-k=Space] svg{width:32px;height:32px}
   #touch .acts [data-k=Space].on{background:var(--accent2)}
-  #touch .acts [data-k=Enter]{right:104px;bottom:0}
-  #touch .acts #tWeap{right:104px;bottom:72px}
-  #touch .acts [data-k=Backspace]{right:16px;bottom:106px;width:54px;height:54px}
+  #touch .acts [data-k=Enter]{right:92px;bottom:0}
+  #touch .acts #tWeap{right:92px;bottom:64px}
+  #touch .acts [data-k=Backspace]{right:14px;bottom:94px;width:48px;height:48px}
   #touch #tPause,#touch #tFull{width:44px;height:44px;top:calc(10px + env(safe-area-inset-top))}
   #touch #tPause{right:calc(10px + env(safe-area-inset-right))} #touch #tFull{right:calc(62px + env(safe-area-inset-right))}
   #touch #tPause svg,#touch #tFull svg{width:20px;height:20px}
@@ -199,7 +199,7 @@
   .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .quick button{height:28px;padding:0 10px;font-size:13px}
   @media (prefers-reduced-motion:reduce){button,#touch button,.sheet-panel{transition:none}.msg{animation-duration:0s}}
-  @media (max-height:420px){ #touch button{width:52px;height:52px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} .h-hero #mascot{display:none} }
+  @media (max-height:420px){ #touch button{width:48px;height:48px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} .h-hero #mascot{display:none} }
   @media (max-width:680px){ .help{columns:1} .panel{padding:18px 18px 20px} .overlay.sheet{align-items:flex-end;padding:0} .sheet-panel{width:100%;max-width:100%;border-radius:var(--r-panel) var(--r-panel) 0 0;max-height:92vh;transform:translateY(40px)} .sheet-foot{padding-bottom:calc(16px + env(safe-area-inset-bottom))} .h-actions{flex-direction:column;width:100%} .h-actions .primary,.h-actions .secondary{width:100%} .row>label{min-width:96px} button.iconbtn span{display:none} }
 </style>
 </head>
@@ -410,7 +410,7 @@
 
 // ============================== CONFIG ==============================
 const CFG = {
-  W: 2400, H: 1200, DT: 1 / 60,
+  W: 3200, H: 1200, DT: 1 / 60,
   G: 520,              // gravity, px/s²
   WIND_ACC: 230,       // wind acceleration at |wind| = 1, scaled per-projectile by windF
   MAX_POWER: 980,      // launch speed at full charge, px/s
@@ -864,10 +864,10 @@ const Terrain = {
         if (dx * dx + dy * dy < 1 + (n2(x / 18, y / 18) - 0.5) * 0.6) m[y * W + x] = 1;
       }
     };
-    if (style === 'Island') for (let k = 0; k < 3; k++) { const rw = 45 + rng() * 55; islet(W * (0.22 + 0.56 * rng()), 240 + rng() * 150, rw, rw * 0.5); }
-    if (style === 'Archipelago') for (let k = 0; k < 2; k++) { const rw = 40 + rng() * 40; islet(W * (0.15 + 0.7 * rng()), 300 + rng() * 150, rw, rw * 0.5); }
+    if (style === 'Island') for (let k = 0; k < Math.round(3 * W / 2400); k++) { const rw = 45 + rng() * 55; islet(W * (0.22 + 0.56 * rng()), 240 + rng() * 150, rw, rw * 0.5); }
+    if (style === 'Archipelago') for (let k = 0; k < Math.round(2.5 * W / 2400); k++) { const rw = 40 + rng() * 40; islet(W * (0.15 + 0.7 * rng()), 300 + rng() * 150, rw, rw * 0.5); }
     if (style === 'Skylands') {
-      const n = 9;
+      const n = Math.round(9 * W / 2400);
       for (let k = 0; k < n; k++) { const rw = 70 + rng() * 90; islet(W * ((k + 0.5) / n + (rng() - 0.5) * 0.05), 340 + rng() * 420, rw, rw * 0.55); }
       for (let k = 0; k < 3; k++) { const rw = 28 + rng() * 25; islet(W * (0.1 + 0.8 * rng()), 220 + rng() * 120, rw, rw * 0.5); }
     }
@@ -3255,7 +3255,7 @@ function bindPointer(cv) {
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
     if (pts.size >= 2 && pinch) {
       const [p1, p2] = [...pts.values()];
-      cam.tz = cam.zoom = clamp(pinch.z * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinch.d, 0.45, 2.2);
+      cam.tz = cam.zoom = clamp(pinch.z * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinch.d, minZoom(), 2.2);
       cam.x -= dx / 2 / cam.zoom; cam.y -= dy / 2 / cam.zoom; cam.manualT = 3;
       return;
     }
@@ -3268,7 +3268,7 @@ function bindPointer(cv) {
     pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) Input.drag = false;
   };
   window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', e => { e.preventDefault(); cam.tz = clamp(cam.tz * Math.exp(-e.deltaY * 0.0012), 0.45, 2.2); }, { passive: false });
+  cv.addEventListener('wheel', e => { e.preventDefault(); cam.tz = clamp(cam.tz * Math.exp(-e.deltaY * 0.0012), minZoom(), 2.2); }, { passive: false });
 }
 // On-screen buttons feed the same key table as the keyboard
 function bindTouchButtons() {
@@ -3302,6 +3302,10 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const view = { w: 0, h: 0, dpr: 1 };
 const cam = { x: CFG.W / 2, y: 600, zoom: 0.8, tz: 0.8, manualT: 0 };
+// Default zoom for a match: as much map as the screen allows while a penguin stays readable.
+// Touch screens stay closer (small screens, fat fingers); desktops see roughly 60% of the map width.
+function fitZoom() { return UI.touch ? clamp(view.w / 1000, 0.7, 0.9) : clamp(Math.min(view.w / 1900, view.h / 950), 0.6, 0.85); }
+function minZoom() { return clamp(view.w / CFG.W, 0.3, 0.45); }   // zoomed all the way out: the whole map on wide screens
 let bg = null;
 let shadowCvs = null, shadowCtx = null;   // screen-sized scratch layer for the terrain's drop shadow
 // The land casts a soft shadow onto the water and hills behind it (a diorama-like depth cue):
@@ -3842,9 +3846,11 @@ const Mini = {
     if (this.hidden) return;
     const T = UI.touch, { w, h } = view;
     if (!T && w < 720) return;
-    if (!this.cvs) { this.cvs = document.createElement('canvas'); this.cvs.width = 240; this.cvs.height = 120; }
-    if (this.ver !== Terrain.version) { this.ver = Terrain.version; const x = this.cvs.getContext('2d'); x.clearRect(0, 0, 240, 120); x.drawImage(Terrain.cvs, 0, 0, CFG.W, CFG.H, 0, 0, 240, 120); }
-    const rows = g.teams.length, mw = T ? 140 : 192, mh = mw / 2, mx = w / 2 - mw / 2, my = T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
+    if (!this.cvs) { this.cvs = document.createElement('canvas'); this.cvs.width = 240; this.cvs.height = Math.round(240 * CFG.H / CFG.W); }
+    if (this.ver !== Terrain.version) { this.ver = Terrain.version; const x = this.cvs.getContext('2d'); x.clearRect(0, 0, 240, this.cvs.height); x.drawImage(Terrain.cvs, 0, 0, CFG.W, CFG.H, 0, 0, 240, this.cvs.height); }
+    const rows = g.teams.length, mw = T ? 128 : 176, mh = Math.round(mw * CFG.H / CFG.W), portrait = T && w < h;
+    // desktop: bottom centre above the team bars; touch landscape: top centre; touch portrait: top right under the timer
+    const mx = portrait ? w - mw - 14 : w / 2 - mw / 2, my = portrait ? 166 : T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
     this.rect = { x: mx, y: my, w: mw, h: mh };
     ctx.save();
     panel(mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.save(); rr(ctx, mx, my, mw, mh, 6); ctx.clip();
@@ -3890,9 +3896,9 @@ function drawHUD() {
   if (g.state === 'placement') { txt('Critters incoming!', w / 2, 60, 28, '#fff'); return; }
   const c = g.active, team = c && c.team;
   // Layout: desktop puts timer/wind at the bottom corners; touch moves them up out of the thumbs' way
-  const T = UI.touch, ps = T && w < 760 ? 0.8 : 1;
+  const T = UI.touch, ps = T ? (w < 760 ? 0.76 : 0.9) : 0.9;
   const L = T ? { tx: w - 46, ty: 98, ts: 0.82, wx: 14, wy: 14 + 70 * ps + 22, ww: 170, bannerY: Math.max(44, h * 0.3) }
-              : { tx: 54, ty: h - 54, ts: 1, ww: 200, wx: w - 216, wy: h - 50, bannerY: 40 };
+              : { tx: 50, ty: h - 50, ts: 0.9, ww: 180, wx: w - 196, wy: h - 50, bannerY: 40 };
   // weapon panel
   if (team && g.state === 'turn') {
     const W = WEAP[g.weapon];
@@ -3947,7 +3953,7 @@ function drawHUD() {
   // team totals
   {
     const narrow = w < 820, rows = g.teams.length, rowH = rows > 4 ? (T ? 12 : 14) : 18;
-    const bw = T ? Math.min(300, Math.max(200, w * 0.45)) : Math.min(360, w - 130), x0 = T ? 14 - 118 : w / 2 - bw / 2;
+    const bw = T ? Math.min(280, Math.max(190, w * 0.42)) : Math.min(320, w - 130), x0 = T ? 14 - 118 : w / 2 - bw / 2;
     const y0 = T ? L.wy + 46 : h - (narrow ? 64 : 14) - rows * rowH;
     if (bw > 120) for (let i = 0; i < rows; i++) {
       const t = g.teams[i], tot = t.critters.reduce((s, c) => s + (c.alive ? Math.max(0, c.hp) : 0), 0), y = y0 + i * rowH;
@@ -4230,7 +4236,7 @@ function makeState() {
 function startBackdrop() {
   g = makeState(); const seed = Math.random() * 1e9 | 0;
   Terrain.generate(resolveMap(settings.map), seed, resolveTheme(settings.theme)); bg = makeBackground(seed, Terrain.cavern);
-  cam.x = CFG.W / 2; cam.y = 600; cam.tz = cam.zoom = Math.max(0.45, Math.min(view.w / CFG.W * 1.6, 0.9));
+  cam.x = CFG.W / 2; cam.y = 600; cam.tz = cam.zoom = Math.max(minZoom(), Math.min(view.w / CFG.W * 1.6, 0.9));
 }
 function surfaceSpots() {
   const spots = [];
@@ -4265,7 +4271,7 @@ function newGame(cfg) {
   for (let i = 0; i < sc.barrels; i++) { const sp = takeSpot(spots, used, 45); spawn(new Barrel(sp.x, sp.y)); }
   g.teamIdx = (Math.random() * g.teams.length | 0) - 1;
   g.state = 'placement'; g.phaseT = 0;
-  cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
+  cam.x = CFG.W / 2; cam.y = 600; cam.tz = fitZoom();
   banner('Critters, assemble!', '#ffd23f');
 }
 function resolveMap(m) { if (m === 'Custom') return !g.online && MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
@@ -4485,7 +4491,9 @@ function updateCamera(dt) {
     if (t && cam.manualT <= 0 && !Input.drag) { const k = Math.min(1, dt * 3.5); cam.x += (t.x - cam.x) * k; cam.y += (t.y - 40 - cam.y) * k; }
   }
   cam.zoom += (cam.tz - cam.zoom) * Math.min(1, dt * 8);
-  cam.x = clamp(cam.x, -100, CFG.W + 100); cam.y = clamp(cam.y, -300, CFG.H + 50);
+  const hw = view.w / 2 / cam.zoom, hh = view.h / 2 / cam.zoom;
+  cam.x = hw * 2 >= CFG.W + 200 ? CFG.W / 2 : clamp(cam.x, hw - 100, CFG.W + 100 - hw);
+  cam.y = clamp(cam.y, -300, Math.max(-300, CFG.H + 60 - hh));
   g.shake = Math.max(0, g.shake - dt * 30);
 }
 
@@ -4790,7 +4798,7 @@ const Net = {
     this.log = []; applyEvents(m.log);   // the guest keeps the terrain log too, in case it has to host one day
     g.teams = m.teams.map((t, i) => ({ name: t.name, color: t.color, ai: false, critters: [], ammo: {}, idx: i, cIdx: -1, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
     applySnap(m.snap);
-    cam.x = CFG.W / 2; cam.y = 600; cam.tz = 0.9;
+    cam.x = CFG.W / 2; cam.y = 600; cam.tz = fitZoom();
     banner(`Joined ${m.teams[0].name}'s game as ${m.teams[this.myTeam].name}!`, m.teams[this.myTeam].color);
   },
 };

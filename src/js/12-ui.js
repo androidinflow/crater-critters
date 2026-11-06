@@ -22,9 +22,11 @@ const Mini = {
     if (this.hidden) return;
     const T = UI.touch, { w, h } = view;
     if (!T && w < 720) return;
-    if (!this.cvs) { this.cvs = document.createElement('canvas'); this.cvs.width = 240; this.cvs.height = 120; }
-    if (this.ver !== Terrain.version) { this.ver = Terrain.version; const x = this.cvs.getContext('2d'); x.clearRect(0, 0, 240, 120); x.drawImage(Terrain.cvs, 0, 0, CFG.W, CFG.H, 0, 0, 240, 120); }
-    const rows = g.teams.length, mw = T ? 140 : 192, mh = mw / 2, mx = w / 2 - mw / 2, my = T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
+    if (!this.cvs) { this.cvs = document.createElement('canvas'); this.cvs.width = 240; this.cvs.height = Math.round(240 * CFG.H / CFG.W); }
+    if (this.ver !== Terrain.version) { this.ver = Terrain.version; const x = this.cvs.getContext('2d'); x.clearRect(0, 0, 240, this.cvs.height); x.drawImage(Terrain.cvs, 0, 0, CFG.W, CFG.H, 0, 0, 240, this.cvs.height); }
+    const rows = g.teams.length, mw = T ? 128 : 176, mh = Math.round(mw * CFG.H / CFG.W), portrait = T && w < h;
+    // desktop: bottom centre above the team bars; touch landscape: top centre; touch portrait: top right under the timer
+    const mx = portrait ? w - mw - 14 : w / 2 - mw / 2, my = portrait ? 166 : T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
     this.rect = { x: mx, y: my, w: mw, h: mh };
     ctx.save();
     panel(mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.save(); rr(ctx, mx, my, mw, mh, 6); ctx.clip();
@@ -70,9 +72,9 @@ function drawHUD() {
   if (g.state === 'placement') { txt('Critters incoming!', w / 2, 60, 28, '#fff'); return; }
   const c = g.active, team = c && c.team;
   // Layout: desktop puts timer/wind at the bottom corners; touch moves them up out of the thumbs' way
-  const T = UI.touch, ps = T && w < 760 ? 0.8 : 1;
+  const T = UI.touch, ps = T ? (w < 760 ? 0.76 : 0.9) : 0.9;
   const L = T ? { tx: w - 46, ty: 98, ts: 0.82, wx: 14, wy: 14 + 70 * ps + 22, ww: 170, bannerY: Math.max(44, h * 0.3) }
-              : { tx: 54, ty: h - 54, ts: 1, ww: 200, wx: w - 216, wy: h - 50, bannerY: 40 };
+              : { tx: 50, ty: h - 50, ts: 0.9, ww: 180, wx: w - 196, wy: h - 50, bannerY: 40 };
   // weapon panel
   if (team && g.state === 'turn') {
     const W = WEAP[g.weapon];
@@ -127,7 +129,7 @@ function drawHUD() {
   // team totals
   {
     const narrow = w < 820, rows = g.teams.length, rowH = rows > 4 ? (T ? 12 : 14) : 18;
-    const bw = T ? Math.min(300, Math.max(200, w * 0.45)) : Math.min(360, w - 130), x0 = T ? 14 - 118 : w / 2 - bw / 2;
+    const bw = T ? Math.min(280, Math.max(190, w * 0.42)) : Math.min(320, w - 130), x0 = T ? 14 - 118 : w / 2 - bw / 2;
     const y0 = T ? L.wy + 46 : h - (narrow ? 64 : 14) - rows * rowH;
     if (bw > 120) for (let i = 0; i < rows; i++) {
       const t = g.teams[i], tot = t.critters.reduce((s, c) => s + (c.alive ? Math.max(0, c.hp) : 0), 0), y = y0 + i * rowH;

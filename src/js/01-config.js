@@ -1,6 +1,6 @@
 // ============================== CONFIG ==============================
 const CFG = {
-  W: 2400, H: 1200, DT: 1 / 60,
+  W: 3200, H: 1200, DT: 1 / 60,
   G: 520,              // gravity, px/s²
   WIND_ACC: 230,       // wind acceleration at |wind| = 1, scaled per-projectile by windF
   MAX_POWER: 980,      // launch speed at full charge, px/s

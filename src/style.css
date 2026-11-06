@@ -147,22 +147,22 @@
   /* ---- touch controls ---- */
   #touch{position:fixed;inset:0;pointer-events:none;z-index:5}
   #touch button{pointer-events:auto;position:absolute;touch-action:none;user-select:none;-webkit-user-select:none;
-    width:62px;height:62px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    width:54px;height:54px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     font-size:10px;font-weight:600;line-height:1;letter-spacing:.2px;color:#fff;background:rgba(15,22,38,.62);box-shadow:0 8px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.18);transition:transform .06s,background .06s}
   #touch button:hover{background:rgba(15,22,38,.62)}
-  #touch button svg{width:24px;height:24px;fill:currentColor;display:block}
+  #touch button svg{width:22px;height:22px;fill:currentColor;display:block}
   #touch button.on{background:rgba(255,255,255,.9);color:#0f1626;transform:scale(.93)}
-  #touch .dpad{position:absolute;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:188px;height:188px}
-  #touch .dpad button svg{width:26px;height:26px}
-  #touch .dpad [data-k=ArrowUp]{left:63px;top:0} #touch .dpad [data-k=ArrowDown]{left:63px;top:126px}
-  #touch .dpad [data-k=ArrowLeft]{left:0;top:63px} #touch .dpad [data-k=ArrowRight]{left:126px;top:63px}
-  #touch .acts{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:188px;height:188px}
-  #touch .acts [data-k=Space]{right:0;bottom:0;width:94px;height:94px;font-size:13px;background:var(--accent);color:var(--accent-ink);border-color:rgba(255,255,255,.35);box-shadow:0 10px 28px rgba(255,123,57,.35)}
-  #touch .acts [data-k=Space] svg{width:36px;height:36px}
+  #touch .dpad{position:absolute;left:calc(12px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));width:162px;height:162px}
+  #touch .dpad button svg{width:24px;height:24px}
+  #touch .dpad [data-k=ArrowUp]{left:54px;top:0} #touch .dpad [data-k=ArrowDown]{left:54px;top:108px}
+  #touch .dpad [data-k=ArrowLeft]{left:0;top:54px} #touch .dpad [data-k=ArrowRight]{left:108px;top:54px}
+  #touch .acts{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));width:162px;height:162px}
+  #touch .acts [data-k=Space]{right:0;bottom:0;width:82px;height:82px;font-size:13px;background:var(--accent);color:var(--accent-ink);border-color:rgba(255,255,255,.35);box-shadow:0 10px 28px rgba(255,123,57,.35)}
+  #touch .acts [data-k=Space] svg{width:32px;height:32px}
   #touch .acts [data-k=Space].on{background:var(--accent2)}
-  #touch .acts [data-k=Enter]{right:104px;bottom:0}
-  #touch .acts #tWeap{right:104px;bottom:72px}
-  #touch .acts [data-k=Backspace]{right:16px;bottom:106px;width:54px;height:54px}
+  #touch .acts [data-k=Enter]{right:92px;bottom:0}
+  #touch .acts #tWeap{right:92px;bottom:64px}
+  #touch .acts [data-k=Backspace]{right:14px;bottom:94px;width:48px;height:48px}
   #touch #tPause,#touch #tFull{width:44px;height:44px;top:calc(10px + env(safe-area-inset-top))}
   #touch #tPause{right:calc(10px + env(safe-area-inset-right))} #touch #tFull{right:calc(62px + env(safe-area-inset-right))}
   #touch #tPause svg,#touch #tFull svg{width:20px;height:20px}
@@ -185,5 +185,5 @@
   .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .quick button{height:28px;padding:0 10px;font-size:13px}
   @media (prefers-reduced-motion:reduce){button,#touch button,.sheet-panel{transition:none}.msg{animation-duration:0s}}
-  @media (max-height:420px){ #touch button{width:52px;height:52px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} .h-hero #mascot{display:none} }
+  @media (max-height:420px){ #touch button{width:48px;height:48px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} .h-hero #mascot{display:none} }
   @media (max-width:680px){ .help{columns:1} .panel{padding:18px 18px 20px} .overlay.sheet{align-items:flex-end;padding:0} .sheet-panel{width:100%;max-width:100%;border-radius:var(--r-panel) var(--r-panel) 0 0;max-height:92vh;transform:translateY(40px)} .sheet-foot{padding-bottom:calc(16px + env(safe-area-inset-bottom))} .h-actions{flex-direction:column;width:100%} .h-actions .primary,.h-actions .secondary{width:100%} .row>label{min-width:96px} button.iconbtn span{display:none} }

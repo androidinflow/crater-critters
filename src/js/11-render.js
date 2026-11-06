@@ -3,6 +3,10 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const view = { w: 0, h: 0, dpr: 1 };
 const cam = { x: CFG.W / 2, y: 600, zoom: 0.8, tz: 0.8, manualT: 0 };
+// Default zoom for a match: as much map as the screen allows while a penguin stays readable.
+// Touch screens stay closer (small screens, fat fingers); desktops see roughly 60% of the map width.
+function fitZoom() { return UI.touch ? clamp(view.w / 1000, 0.7, 0.9) : clamp(Math.min(view.w / 1900, view.h / 950), 0.6, 0.85); }
+function minZoom() { return clamp(view.w / CFG.W, 0.3, 0.45); }   // zoomed all the way out: the whole map on wide screens
 let bg = null;
 let shadowCvs = null, shadowCtx = null;   // screen-sized scratch layer for the terrain's drop shadow
 // The land casts a soft shadow onto the water and hills behind it (a diorama-like depth cue):

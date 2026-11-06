@@ -95,10 +95,10 @@ const Terrain = {
         if (dx * dx + dy * dy < 1 + (n2(x / 18, y / 18) - 0.5) * 0.6) m[y * W + x] = 1;
       }
     };
-    if (style === 'Island') for (let k = 0; k < 3; k++) { const rw = 45 + rng() * 55; islet(W * (0.22 + 0.56 * rng()), 240 + rng() * 150, rw, rw * 0.5); }
-    if (style === 'Archipelago') for (let k = 0; k < 2; k++) { const rw = 40 + rng() * 40; islet(W * (0.15 + 0.7 * rng()), 300 + rng() * 150, rw, rw * 0.5); }
+    if (style === 'Island') for (let k = 0; k < Math.round(3 * W / 2400); k++) { const rw = 45 + rng() * 55; islet(W * (0.22 + 0.56 * rng()), 240 + rng() * 150, rw, rw * 0.5); }
+    if (style === 'Archipelago') for (let k = 0; k < Math.round(2.5 * W / 2400); k++) { const rw = 40 + rng() * 40; islet(W * (0.15 + 0.7 * rng()), 300 + rng() * 150, rw, rw * 0.5); }
     if (style === 'Skylands') {
-      const n = 9;
+      const n = Math.round(9 * W / 2400);
       for (let k = 0; k < n; k++) { const rw = 70 + rng() * 90; islet(W * ((k + 0.5) / n + (rng() - 0.5) * 0.05), 340 + rng() * 420, rw, rw * 0.55); }
       for (let k = 0; k < 3; k++) { const rw = 28 + rng() * 25; islet(W * (0.1 + 0.8 * rng()), 220 + rng() * 120, rw, rw * 0.5); }
     }
