@@ -270,7 +270,8 @@ const UI = {
     chips('theme', [['Meadow', 'Meadow'], ['Snow', 'Snow'], ['Desert', 'Desert'], ['Volcanic', 'Volcanic'], ['Random', 'Random']], 'theme', startBackdrop);
     { const el = $('scheme'); el.innerHTML = '';
       for (const [v, sub] of [['Classic', 'Balanced arsenal, crates and mines'], ['Melee Only', 'Close-range brawl, no artillery'], ['Chaos Crates', 'Everything, lots of it, crates every turn'], ['Artillery', 'Long range only, no mines']]) {
-        const b = document.createElement('button'); b.className = 'card' + (settings.scheme === v ? ' on' : ''); b.innerHTML = `<b></b><span></span>`; b.firstChild.textContent = v; b.lastChild.textContent = sub;
+        const b = document.createElement('button'); b.className = 'chip' + (settings.scheme === v ? ' on' : ''); b.textContent = v;
+        if (settings.scheme === v) $('schemeNote').textContent = sub;
         b.onclick = () => { settings.scheme = v; saveSettings(); T.buildMenu(); }; el.appendChild(b); } }
     const stepper = (id, vals, key, label) => { const el = $(id); el.innerHTML = ''; let i = vals.indexOf(settings[key]); if (i < 0) { i = 0; settings[key] = vals[0]; }
       const mk = (txt, d) => { const b = document.createElement('button'); b.textContent = txt; b.disabled = i + d < 0 || i + d >= vals.length; b.setAttribute('aria-label', d < 0 ? 'Less' : 'More'); b.onclick = () => { settings[key] = vals[i + d]; saveSettings(); T.buildMenu(); }; return b; };
@@ -287,10 +288,10 @@ const UI = {
     if (g) { const av = $('avatar').getContext('2d'); av.clearRect(0, 0, 36, 36); const m = new Critter({ color: TEAM_COLORS[settings.teams[0].color] }, '');
       Object.assign(m, { x: 18, y: 19, r: 9, facing: 1, mode: 'ground', alive: true, blinkT: 2 }); drawCritter(av, m, 0); }
   },
-  openSheet(id) { $(id).classList.remove('hidden'); requestAnimationFrame(() => $(id).classList.add('open')); },
-  closeSheet(id) { $(id).classList.remove('open'); $(id).classList.add('hidden'); this.buildMenu(); },
+  openSheet(id) { const el = $(id); el.classList.remove('hidden'); $('menu').classList.toggle('peek', id === 'setup'); void el.offsetWidth; el.classList.add('open'); },   // the reflow lets the slide-in transition run even when frames are throttled
+  closeSheet(id) { $(id).classList.remove('open'); $(id).classList.add('hidden'); $('menu').classList.remove('peek'); this.buildMenu(); },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); startBackdrop(); this.buildMenu(); },
-  hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board', 'setup', 'online', 'profile'].forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('open'); }); this.pickerOpen = this.paused = this.helpOpen = false; },
+  hideAll() { $('menu').classList.remove('peek'); ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board', 'setup', 'online', 'profile'].forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('open'); }); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
     if (!(g.state === 'turn' && g.controlling && !g.ai && !g.fired && !g.lockWeapon && !this.paused && myTurn())) return;
@@ -386,16 +387,110 @@ $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinB
 $('lobbyCancel').onclick = () => UI.showMenu();
 $('menuBtn').onclick = () => UI.showMenu();
 
-// little animated mascot line-up on the menu
-const mascotCtx = $('mascot').getContext('2d');
-const mascots = [0, 1, 2, 3].map(i => Object.assign(new Critter({ color: TEAM_COLORS[i] }, ''), { x: 70 + i * 93, y: 62, facing: i < 2 ? 1 : -1, mode: 'ground', r: 18 }));
+// The home-screen squad: four penguins kitted out for battle, standing at ease (no hopping).
+// Each is unique: army helmet + bazooka, bandana + bomb, beret + shotgun, steel helm + grenade.
+// Drawn at 2x so the edges stay crisp on dense screens.
+const MASCOT_W = 520, MASCOT_H = 132, MASCOT_S = 2;
+const mascotCtx = (() => { const c = $('mascot'); c.width = MASCOT_W * MASCOT_S; c.height = MASCOT_H * MASCOT_S; return c.getContext('2d'); })();
+const mascots = [0, 1, 2, 3].map(i => Object.assign(new Critter({ color: TEAM_COLORS[i] }, ''),
+  { x: 84 + i * 118, y: 90, facing: i < 2 ? 1 : -1, mode: 'ground', r: 21, alive: true, gear: ['bazooka', 'bomb', 'shotgun', 'grenade'][i], seed: i * 2.3 }));
 function drawMascots(t) {
-  const x = mascotCtx; x.clearRect(0, 0, 420, 96);
+  const x = mascotCtx; x.setTransform(MASCOT_S, 0, 0, MASCOT_S, 0, 0); x.clearRect(0, 0, MASCOT_W, MASCOT_H);
   mascots.forEach((m, i) => {
     m.team.color = TEAM_COLORS[(settings.teams[i] || { color: i }).color];
-    const hop = Math.max(0, Math.sin(t * 3 + i * 1.3)); m.y = 62 - hop * 18; m.squash = hop < 0.1 ? 0.15 : -0.05;
-    m.px = Math.sin(t * 5 + i) * 1.5; m.py = Math.cos(t * 4 + i) * 1.2 + 0.5; m.hurtT = (t + i) % 6 < 0.4 ? 1 : 0; m.blinkT = ((t * 0.9 + i * 1.7) % 3.3); m.face = m.hurtT ? 1 : 0; m.faceT = m.hurtT;
-    drawCritter(x, m, t);
+    m.squash = 0; m.hurtT = 0; m.face = 0; m.faceT = 0;
+    // eyes scan the horizon, the odd blink; the body breathes inside drawCritter
+    m.px = Math.sin(t * 0.6 + i * 1.9) * 1.6; m.py = Math.cos(t * 0.45 + i) * 0.6 + 0.3; m.blinkT = (t * 0.8 + i * 1.7) % 3.7;
+    drawGear(x, m, t, true); drawCritter(x, m, t); drawGear(x, m, t, false);
   });
+}
+// Gear is drawn in the penguin's own frame (facing +x, same breathing squash as the body):
+// `behind` for what sits past the far shoulder, then in front after the body
+function drawGear(x, m, t, behind) {
+  const r = m.r, br = Math.sin(t * 3 + m.seed) * 0.03, col = m.team.color;
+  x.save(); x.translate(m.x, m.y); x.translate(0, r); x.scale(1 + br, 1 - br); x.translate(0, -r); x.scale(m.facing, 1);
+  x.lineJoin = 'round'; x.lineCap = 'round'; x.strokeStyle = '#121420'; x.lineWidth = 1.3;
+  const grad = (x0, y0, x1, y1, a, b) => { const gr = x.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, a); gr.addColorStop(1, b); return gr; };
+  const flipper = ang => { x.fillStyle = '#2a2f42'; x.strokeStyle = '#121420'; x.lineWidth = 1.2; x.save(); x.translate(r * 0.15, -r * 0.1); x.rotate(ang); x.beginPath(); x.ellipse(0, r * 0.52, r * 0.22, r * 0.6, 0, 0, 7); x.fill(); x.stroke(); x.restore(); };
+  const brows = k => { x.strokeStyle = '#121420'; x.lineWidth = 1.7; x.beginPath(); x.moveTo(-r * 0.1, -r * (0.94 - k)); x.lineTo(r * 0.47, -r * 0.8); x.moveTo(r * 0.5, -r * 0.8); x.lineTo(r * 0.92, -r * (0.7 + k)); x.stroke(); };
+  const dome = (fill, line, ry = 0.66) => { // a helmet shell over the crown, brim just above the eyes
+    x.save(); x.translate(r * 0.08, -r * 0.86); x.fillStyle = fill; x.strokeStyle = line; x.lineWidth = 1.4;
+    x.beginPath(); x.ellipse(0, 0, r * 1.02, r * ry, 0, Math.PI, 0); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = 'rgba(255,255,255,0.2)'; x.beginPath(); x.ellipse(-r * 0.32, -r * ry * 0.55, r * 0.3, r * 0.1, -0.35, 0, 7); x.fill();
+    x.fillStyle = line; x.beginPath(); x.ellipse(0, 0, r * 1.1, r * 0.13, 0, 0, 7); x.fill(); x.restore(); };
+  switch (m.gear) {
+    case 'bazooka':
+      if (!behind) { // launcher held at the hip, pointing up and forward; army helmet with a chin strap
+        x.save(); x.translate(-r * 0.3, r * 0.5); x.rotate(-0.28);
+        rr(x, -r * 1.2, -r * 0.22, r * 2.7, r * 0.44, r * 0.1); fs(x, grad(0, -r * 0.22, 0, r * 0.22, '#8a9868', '#3d4729'));
+        rr(x, -r * 1.25, -r * 0.3, r * 0.42, r * 0.6, r * 0.08); fs(x, '#2f3626');
+        rr(x, r * 1.1, -r * 0.3, r * 0.48, r * 0.6, r * 0.08); fs(x, '#2f3626');
+        x.beginPath(); x.moveTo(r * 1.58, -r * 0.14); x.lineTo(r * 2.05, 0); x.lineTo(r * 1.58, r * 0.14); x.closePath(); fs(x, '#e63946');   // rocket nose peeking out
+        rr(x, r * 0.15, r * 0.2, r * 0.22, r * 0.45, 2); fs(x, '#2b1d12');   // grip
+        x.strokeStyle = 'rgba(255,255,255,0.3)'; x.lineWidth = 1; x.beginPath(); x.moveTo(-r * 1.0, -r * 0.1); x.lineTo(r * 1.0, -r * 0.1); x.stroke();
+        x.restore();
+        flipper(-1.35); brows(0.05); dome(grad(-r, -r * 1.5, r, -r * 0.8, '#95a56a', '#4e5a33'), '#343d22');
+        x.strokeStyle = '#343d22'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(r * 1.0, -r * 0.82); x.quadraticCurveTo(r * 1.05, -r * 0.3, r * 0.55, r * 0.02); x.stroke();   // chin strap
+        x.fillStyle = '#c9d2a0'; x.fillRect(-r * 0.55, -r * 1.3, r * 0.3, r * 0.1);
+      }
+      break;
+    case 'bomb':
+      if (!behind) { // a classic round bomb hugged in front, fuse sparking; deep red bandana
+        x.save(); x.translate(r * 0.6, r * 0.12);
+        const g2 = x.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.05, 0, 0, r * 0.64); g2.addColorStop(0, '#5a6078'); g2.addColorStop(0.6, '#262a3a'); g2.addColorStop(1, '#0e111c');
+        circ(x, 0, 0, r * 0.58); fs(x, g2);
+        rr(x, -r * 0.13, -r * 0.74, r * 0.26, r * 0.2, 2); fs(x, '#9aa3ad');
+        x.strokeStyle = '#d9c8a0'; x.lineWidth = 2; x.beginPath(); x.moveTo(0, -r * 0.74); x.quadraticCurveTo(r * 0.12, -r * 1.1, r * 0.45, -r * 1.05); x.stroke();
+        const sp = 0.6 + Math.sin(t * 23) * 0.4, fx = r * 0.45, fy = -r * 1.05;
+        x.fillStyle = `rgba(255,230,120,${0.45 + sp * 0.45})`; circ(x, fx, fy, 2.5 + sp * 2.5); x.fill();
+        x.fillStyle = '#ff9a3c'; circ(x, fx, fy, 1.3 + sp); x.fill();
+        x.strokeStyle = 'rgba(255,210,90,0.85)'; x.lineWidth = 1;
+        for (let k = 0; k < 5; k++) { const a = t * 11 + k * 1.26, l = 3.5 + sp * 3; x.beginPath(); x.moveTo(fx + Math.cos(a) * 2, fy + Math.sin(a) * 2); x.lineTo(fx + Math.cos(a) * l, fy + Math.sin(a) * l); x.stroke(); }
+        x.restore();
+        flipper(-1.2); brows(0.0);
+        // bandana: band across the forehead, knot and two tails fluttering behind
+        x.strokeStyle = '#121420'; x.lineWidth = r * 0.26; x.beginPath(); x.moveTo(-r * 0.95, -r * 0.84); x.quadraticCurveTo(r * 0.05, -r * 1.2, r * 1.0, -r * 0.84); x.stroke();
+        x.strokeStyle = '#c8233c'; x.lineWidth = r * 0.2; x.beginPath(); x.moveTo(-r * 0.95, -r * 0.84); x.quadraticCurveTo(r * 0.05, -r * 1.2, r * 1.0, -r * 0.84); x.stroke();
+        const fl = Math.sin(t * 5 + 1) * 2; x.fillStyle = '#c8233c'; x.strokeStyle = '#121420'; x.lineWidth = 1.2;
+        x.beginPath(); x.moveTo(-r * 0.9, -r * 0.9); x.lineTo(-r * 1.55, -r * 1.05 + fl); x.lineTo(-r * 1.45, -r * 0.7 + fl); x.closePath(); x.fill(); x.stroke();
+        x.beginPath(); x.moveTo(-r * 0.9, -r * 0.9); x.lineTo(-r * 1.5, -r * 0.55 - fl); x.lineTo(-r * 1.2, -r * 0.45 - fl); x.closePath(); x.fill(); x.stroke();
+        circ(x, -r * 0.92, -r * 0.88, r * 0.12); fs(x, '#a51a30');
+      }
+      break;
+    case 'shotgun':
+      if (!behind) { // double-barrel across the chest; a tilted beret in the team colour
+        x.save(); x.translate(-r * 0.05, r * 0.08); x.rotate(-0.4);
+        rr(x, -r * 1.3, -r * 0.18, r * 0.95, r * 0.38, 3); fs(x, grad(0, -r * 0.2, 0, r * 0.2, '#a3703d', '#5c3a1c'));
+        rr(x, -r * 0.45, -r * 0.24, r * 1.95, r * 0.22, 2); fs(x, grad(0, -r * 0.24, 0, 0, '#b4bdc8', '#6c7580'));
+        rr(x, -r * 0.45, 0, r * 1.95, r * 0.22, 2); fs(x, grad(0, 0, 0, r * 0.22, '#8e97a2', '#4a525c'));
+        x.fillStyle = '#2b1d12'; rr(x, -r * 0.25, r * 0.2, r * 0.24, r * 0.24, 2); x.fill();
+        x.restore();
+        flipper(-1.0); brows(0.12);
+        x.save(); x.translate(r * 0.05, -r * 1.2); x.rotate(-0.2);
+        x.beginPath(); x.ellipse(0, r * 0.12, r * 0.78, r * 0.16, 0, 0, 7); fs(x, shade(col, -0.45));   // band
+        x.beginPath(); x.ellipse(r * 0.1, -r * 0.08, r * 0.95, r * 0.32, 0, 0, 7); fs(x, grad(-r, -r * 0.4, r, 0, shade(col, 0.1), shade(col, -0.35)));
+        circ(x, r * 0.15, -r * 0.38, r * 0.07); x.fillStyle = shade(col, -0.5); x.fill(); x.restore();
+      }
+      break;
+    case 'grenade':
+      if (!behind) { // steel helm with a ridge and rivets; a pineapple grenade held up, pin still in
+        x.save(); x.translate(r * 0.95, -r * 0.4); x.rotate(0.15);
+        const g3 = x.createRadialGradient(-r * 0.12, -r * 0.15, r * 0.04, 0, 0, r * 0.5); g3.addColorStop(0, '#8aa05a'); g3.addColorStop(1, '#394523');
+        x.beginPath(); x.ellipse(0, r * 0.05, r * 0.36, r * 0.46, 0, 0, 7); fs(x, g3);
+        x.strokeStyle = 'rgba(0,0,0,0.4)'; x.lineWidth = 1;
+        for (let k = -1; k <= 1; k++) { x.beginPath(); x.moveTo(-r * 0.3, r * 0.05 + k * r * 0.2); x.lineTo(r * 0.3, r * 0.05 + k * r * 0.2); x.stroke(); }
+        x.beginPath(); x.moveTo(-r * 0.12, -r * 0.35); x.lineTo(-r * 0.12, r * 0.45); x.moveTo(r * 0.12, -r * 0.35); x.lineTo(r * 0.12, r * 0.45); x.stroke();
+        x.strokeStyle = '#121420'; rr(x, -r * 0.12, -r * 0.6, r * 0.24, r * 0.22, 2); fs(x, '#9aa3ad');   // cap
+        x.beginPath(); x.moveTo(r * 0.1, -r * 0.55); x.quadraticCurveTo(r * 0.5, -r * 0.5, r * 0.42, r * 0.1); x.lineWidth = 2.6; x.strokeStyle = '#121420'; x.stroke(); x.lineWidth = 1.4; x.strokeStyle = '#b8c1cc'; x.stroke();   // lever
+        x.strokeStyle = '#ffd23f'; x.lineWidth = 1.4; circ(x, -r * 0.22, -r * 0.62, r * 0.1); x.stroke();   // pin ring
+        x.restore();
+        flipper(-1.55); brows(0.08);
+        dome(grad(-r, -r * 1.5, r, -r * 0.8, '#b4bdc8', '#5a6370'), '#3a424c', 0.7);
+        x.strokeStyle = '#3a424c'; x.lineWidth = 2.2; x.beginPath(); x.moveTo(r * 0.08, -r * 1.56); x.lineTo(r * 0.08, -r * 1.2); x.stroke();   // ridge
+        x.fillStyle = '#d9dfe6'; for (const px of [-0.7, -0.25, 0.25, 0.7]) { circ(x, r * 0.08 + r * px, -r * 0.86, 1.3); x.fill(); }   // rivets
+      }
+      break;
+  }
+  x.restore();
 }
 

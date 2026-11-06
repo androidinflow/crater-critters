@@ -27,18 +27,37 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
+function mixHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; }
 function makeBackground(seed, cavern) {
   const rng = mulberry32(seed ^ 0x5bd1e995), n = noise1(rng);
-  const layers = [];
-  const th = Terrain.theme, specs = cavern
-    ? [{ p: 0.12, col: '#2a2140', amp: 160, base: 0.55, f: 180 }, { p: 0.28, col: '#3a2d55', amp: 120, base: 0.7, f: 110 }]
-    : [{ p: 0.12, col: th.layers[0], amp: 220, base: 0.62, f: 260 }, { p: 0.25, col: th.layers[1], amp: 160, base: 0.72, f: 150 }, { p: 0.4, col: th.layers[2], amp: 90, base: 0.82, f: 90 }];
-  specs.forEach((s, i) => { const h = new Float32Array(1024); for (let k = 0; k < 1024; k++) h[k] = (fbm(n, k * 8 / s.f + i * 100, 3) * 0.5 + 0.5) * s.amp; layers.push({ ...s, h }); });
-  const clouds = Array.from({ length: 14 }, () => ({ x: rand(0, 3000), y: rand(30, 300), s: rand(0.6, 1.5), v: rand(6, 16) }));
-  return { layers, clouds, cavern };
+  const th = Terrain.theme, sky = th.sky[1];
+  // ridges far to near: the far ones sit higher, scroll less and fade into the sky (aerial perspective)
+  const specs = cavern
+    ? [{ p: 0.06, col: '#1d1830', amp: 200, base: 0.5, f: 300, haze: 0 }, { p: 0.14, col: '#2a2140', amp: 160, base: 0.6, f: 180, haze: 0 }, { p: 0.3, col: '#3a2d55', amp: 120, base: 0.72, f: 110, haze: 0 }]
+    : [{ p: 0.05, col: th.layers[0], amp: 250, base: 0.55, f: 440, haze: 0.55 }, { p: 0.12, col: th.layers[0], amp: 220, base: 0.63, f: 260, haze: 0.3 },
+       { p: 0.25, col: th.layers[1], amp: 160, base: 0.73, f: 150, haze: 0.12 }, { p: 0.42, col: th.layers[2], amp: 90, base: 0.84, f: 90, haze: 0 }];
+  const layers = specs.map((s, i) => {
+    const h = new Float32Array(1024); for (let k = 0; k < 1024; k++) h[k] = (fbm(n, k * 8 / s.f + i * 100, 3) * 0.5 + 0.5) * s.amp;
+    return { ...s, h, fill: cavern ? s.col : mixHex(s.col, sky, s.haze), rim: `rgba(255,255,255,${cavern ? 0.05 : 0.1 + s.haze * 0.14})` };
+  });
+  const clouds = Array.from({ length: 16 }, () => ({ x: rand(0, 3000), y: rand(20, 320), s: rand(0.6, 1.6), v: rand(4, 12), p: rand(0.15, 0.35) }));
+  const fog = Array.from({ length: 21 }, (_, i) => ({ x: rand(0, 2600), band: i % 3, rx: rand(150, 340), ry: rand(18, 42), v: rand(3, 9), a: rand(0.5, 1) }));
+  return { layers, clouds, fog, cavern };
+}
+// Soft fog banks: wide flat blobs drifting slowly along the foot of a ridge
+function drawFog(band, y, p) {
+  const { w } = view, th = Terrain.theme, cav = bg.cavern, span = w + 900;
+  const col = cav ? '40,30,70' : th.lava ? '110,70,80' : hexToRgb(th.sky[2]).join(',');
+  for (const f of bg.fog) {
+    if (f.band !== band) continue;
+    const x = ((f.x - cam.x * p + g.time * f.v) % span + span) % span - 450, a = (cav ? 0.16 : 0.24) * f.a;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, f.ry / f.rx);
+    const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, f.rx); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, f.rx, 0, 7); ctx.fill(); ctx.restore();
+  }
 }
 function drawBackground() {
-  const { w, h } = view, cav = bg && bg.cavern;
+  const { w, h } = view, cav = bg && bg.cavern, z = cam.zoom, dy = cam.y - 600;
   const gr = ctx.createLinearGradient(0, 0, 0, h);
   if (cav) { gr.addColorStop(0, '#120c22'); gr.addColorStop(1, '#2e2148'); }
   else if (g.sd) { gr.addColorStop(0, '#5a2a4a'); gr.addColorStop(0.6, '#e07a5f'); gr.addColorStop(1, '#f2cc8f'); }
@@ -46,33 +65,33 @@ function drawBackground() {
   ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
   if (!bg) return;
   const th = Terrain.theme;
-  if (!cav) { // sun
-    const sx = w * 0.8 - cam.x * 0.03, sy = h * 0.2;
-    ctx.fillStyle = th.lava ? 'rgba(255,120,60,0.3)' : 'rgba(255,240,180,0.35)'; ctx.beginPath(); ctx.arc(sx, sy, 70 + Math.sin(g.time) * 4, 0, 7); ctx.fill();
-    ctx.fillStyle = th.sun; ctx.beginPath(); ctx.arc(sx, sy, 42, 0, 7); ctx.fill();
+  if (!cav) { // sun with a soft halo
+    const sx = w * 0.8 - cam.x * 0.03, sy = h * 0.2 - dy * 0.02, R = 200;
+    const halo = ctx.createRadialGradient(sx, sy, 20, sx, sy, R); halo.addColorStop(0, th.lava ? 'rgba(255,120,60,0.45)' : 'rgba(255,240,190,0.5)'); halo.addColorStop(0.35, th.lava ? 'rgba(255,120,60,0.14)' : 'rgba(255,240,190,0.16)'); halo.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.fillStyle = halo; ctx.fillRect(sx - R, sy - R, R * 2, R * 2);
+    ctx.fillStyle = th.sun; ctx.beginPath(); ctx.arc(sx, sy, 42 + Math.sin(g.time) * 1.5, 0, 7); ctx.fill();
   } else { // glowing crystals in the cave wall
     for (let i = 0; i < 30; i++) { const x = ((i * 397 - cam.x * 0.08) % (w + 100) + w + 100) % (w + 100) - 50, y = (i * 211) % h;
       ctx.fillStyle = `rgba(150,120,255,${0.15 + 0.1 * Math.sin(g.time * 2 + i)})`; ctx.beginPath(); ctx.arc(x, y, 3 + (i % 3), 0, 7); ctx.fill(); }
   }
-  // clouds (parallax 0.3, drift with wind)
-  if (!cav) for (const c of bg.clouds) {
-    const span = w + 600, x = ((c.x - cam.x * 0.3) % span + span) % span - 300, y = c.y - (cam.y - 600) * 0.15;
-    ctx.fillStyle = th.cloud;
+  // clouds: each at its own depth, the far ones fainter, all drifting slowly
+  if (!cav) { for (const c of bg.clouds) {
+    const span = w + 600, x = ((c.x - cam.x * c.p + g.time * c.v * 0.3) % span + span) % span - 300, y = c.y - dy * c.p * 0.5;
+    ctx.fillStyle = th.cloud; ctx.globalAlpha = 0.45 + c.p * 1.6;
     for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + k * 26 * c.s, y + Math.sin(k * 2) * 6 * c.s, (22 - Math.abs(k - 1.5) * 4) * c.s, 0, 7); ctx.fill(); }
-  }
-  // mountains / cave silhouettes
-  for (const L of bg.layers) {
-    ctx.fillStyle = L.col; ctx.beginPath();
-    const baseY = h * L.base - (cam.y - 600) * L.p * cam.zoom;
+  } ctx.globalAlpha = 1; }
+  // ridges far to near: a lit crest on each, and a fog bank lying in the valley in front of it
+  bg.layers.forEach((L, i) => {
+    const baseY = h * L.base - dy * L.p * z, crest = () => { for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, baseY - L.h[k]); } };
     if (cav) { // stalactites from the top
-      ctx.moveTo(0, 0);
-      for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, (1 - L.base) * h * 0.4 + L.h[k] * 0.8 - (cam.y - 600) * L.p * 0.3); }
-      ctx.lineTo(w, 0); ctx.closePath(); ctx.fill(); ctx.beginPath();
+      ctx.fillStyle = L.fill; ctx.beginPath(); ctx.moveTo(0, 0);
+      for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, (1 - L.base) * h * 0.4 + L.h[k] * 0.8 - dy * L.p * 0.3); }
+      ctx.lineTo(w, 0); ctx.closePath(); ctx.fill();
     }
-    ctx.moveTo(0, h);
-    for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, baseY - L.h[k]); }
-    ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
-  }
+    ctx.fillStyle = L.fill; ctx.beginPath(); ctx.moveTo(0, h); crest(); ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = L.rim; ctx.lineWidth = 1; ctx.beginPath(); crest(); ctx.stroke();
+    if (i >= 1) drawFog(i - 1, baseY + 8, L.p * 1.3);
+  });
   // weather: drifting snowflakes / rising embers (screen space, purely decorative)
   if (th.flakes && !cav) { ctx.fillStyle = 'rgba(255,255,255,0.8)';
     for (let i = 0; i < 60; i++) { const sp = 18 + (i % 5) * 9, x = ((i * 173 + Math.sin(g.time * 0.7 + i) * 30 + g.wind * g.time * 40 - cam.x * 0.2) % (w + 40) + w + 40) % (w + 40) - 20, y = ((i * 97 + g.time * sp) % (h + 20) + h + 20) % (h + 20) - 10;

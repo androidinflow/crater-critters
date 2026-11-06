@@ -71,7 +71,10 @@
   .profile canvas{width:32px;height:32px}
   .profile span{font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis}
   .h-hero{text-align:center;padding:0 16px}
-  #mascot{display:block;margin:0 auto 6px;max-width:100%;height:84px;width:auto;filter:drop-shadow(0 8px 12px rgba(0,0,0,.35))}
+  #mascot{display:block;margin:0 auto 4px;max-width:100%;height:116px;width:auto;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4))}
+  #menu>*{transition:opacity .2s}
+  #menu.peek{background:none}
+  #menu.peek>*{opacity:0;pointer-events:none}
   h1.logo{margin:0;font-size:clamp(34px,6vw,56px);line-height:1;font-weight:800;letter-spacing:-1.5px;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.55)}
   .tag{margin:10px 0 0;color:var(--muted);font-size:15px;text-shadow:0 2px 12px rgba(0,0,0,.5)}
   #iosTip{margin-top:10px}
@@ -82,18 +85,39 @@
   .h-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
   .h-actions .primary{min-width:220px}
   .h-actions .secondary{height:52px;padding:0 24px}
-  /* ---- sheets (match settings, online, profile) ---- */
-  .overlay.sheet{align-items:center}
-  .sheet-panel{width:min(720px,94vw);padding:0;display:flex;flex-direction:column;max-height:88vh;transform:translateY(16px);opacity:0;transition:transform .18s ease-out,opacity .18s ease-out}
+  /* ---- sheets: match settings docks to the left edge so the map stays in view; online/profile are small centred dialogs ---- */
+  .overlay.sheet.side{align-items:stretch;justify-content:flex-start;padding:0;background:none}
+  .overlay.sheet.center{align-items:center;justify-content:center}
+  .sheet-panel{padding:0;display:flex;flex-direction:column;opacity:0;transition:transform .2s ease-out,opacity .2s ease-out}
+  .side .sheet-panel{width:min(400px,94vw);max-width:none;max-height:none;border-radius:0;border-width:0 1px 0 0;box-shadow:12px 0 40px rgba(2,6,16,.45);transform:translateX(-28px)}
+  .center .sheet-panel{width:min(420px,94vw);max-height:88vh;transform:translateY(16px)}
   .sheet.open .sheet-panel{transform:none;opacity:1}
-  .sheet-panel.narrow{width:min(420px,94vw)}
-  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px 24px;border-bottom:1px solid var(--line)}
-  .sheet-head h2{margin:0;text-align:left;font-size:19px}
-  .sheet-body{padding:16px 24px;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top)) 12px 8px 20px;border-bottom:1px solid var(--line)}
+  .sheet-head h2{margin:0;text-align:left;font-size:17px}
+  .sheet-body{padding:16px 24px;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;flex:1}
   .sheet-body section{padding:4px 0 14px;margin-bottom:10px;border-bottom:1px solid var(--line)}
   .sheet-body section:last-child{border-bottom:0;margin-bottom:0}
-  .sheet-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 24px 16px;border-top:1px solid var(--line)}
-  .sheet-foot .primary{height:44px;padding:0 28px;box-shadow:none}
+  .sheet-foot{display:flex;justify-content:flex-end;gap:10px;padding:10px 20px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .sheet-foot .primary{height:42px;padding:0 26px;box-shadow:none}
+  .sheet-foot .secondary{height:42px}
+  /* compact settings: small labels, tight rows, chips for every choice */
+  .sheet-body.compact{padding:8px 20px 12px}
+  .sheet-body.compact section{padding:6px 0 10px;margin-bottom:4px}
+  .sheet-body.compact h3{margin:0 0 6px;font-size:12px}
+  .sheet-body.compact .row{margin:4px 0;gap:8px;flex-wrap:nowrap}
+  .sheet-body.compact .row>label{min-width:90px;font-size:13px}
+  .sheet-body.compact .chips{gap:5px;margin-bottom:4px}
+  .sheet-body.compact .chip{height:30px;padding:0 11px;font-size:12.5px}
+  .sheet-body.compact .small{font-size:12px;margin:4px 0 2px;min-height:0}
+  .sheet-body.compact .team{margin:5px 0;padding:3px 6px 3px 5px;gap:8px;grid-template-columns:26px 1fr auto}
+  .sheet-body.compact .swatch{width:26px;height:26px}
+  .sheet-body.compact .team input{height:30px;font-size:13px}
+  .sheet-body.compact .seg{padding:2px}
+  .sheet-body.compact .seg button{height:26px;min-width:30px;padding:0 8px;font-size:13px}
+  .sheet-body.compact .seg.tight button{min-width:26px;padding:0 5px}
+  .sheet-body.compact .stepper button{width:32px;height:30px;font-size:16px}
+  .sheet-body.compact .stepper output{min-width:88px;font-size:13px}
+  .sheet-body.compact .imgtools button.sm{height:28px;padding:0 9px}
   .or{text-align:center;color:var(--faint);font-size:13px;margin:14px 0}
   .joinrow{display:flex;gap:8px}
   .joinrow input{flex:1;text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:700;font-size:18px}
@@ -186,4 +210,4 @@
   .quick button{height:28px;padding:0 10px;font-size:13px}
   @media (prefers-reduced-motion:reduce){button,#touch button,.sheet-panel{transition:none}.msg{animation-duration:0s}}
   @media (max-height:420px){ #touch button{width:48px;height:48px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} .h-hero #mascot{display:none} }
-  @media (max-width:680px){ .help{columns:1} .panel{padding:18px 18px 20px} .overlay.sheet{align-items:flex-end;padding:0} .sheet-panel{width:100%;max-width:100%;border-radius:var(--r-panel) var(--r-panel) 0 0;max-height:92vh;transform:translateY(40px)} .sheet-foot{padding-bottom:calc(16px + env(safe-area-inset-bottom))} .h-actions{flex-direction:column;width:100%} .h-actions .primary,.h-actions .secondary{width:100%} .row>label{min-width:96px} button.iconbtn span{display:none} }
+  @media (max-width:680px){ .help{columns:1} .panel{padding:18px 18px 20px} .overlay.sheet.side,.overlay.sheet.center{align-items:flex-end;justify-content:center;padding:0} .sheet-panel,.side .sheet-panel,.center .sheet-panel{width:100%;max-width:100%;border-radius:var(--r-panel) var(--r-panel) 0 0;border-width:1px 0 0;box-shadow:var(--shadow);max-height:88vh;transform:translateY(40px)} .side .sheet-panel{max-height:66vh} .sheet-head{padding-top:12px} .h-actions{flex-direction:column;width:100%} .h-actions .primary,.h-actions .secondary{width:100%} .row>label{min-width:96px} button.iconbtn span{display:none} }

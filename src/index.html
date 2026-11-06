@@ -56,7 +56,7 @@
     </div>
   </header>
   <div class="h-hero">
-    <canvas id="mascot" width="420" height="96"></canvas>
+    <canvas id="mascot" width="1040" height="264"></canvas>
     <h1 class="logo">Crater Critters</h1>
     <p class="tag">Turn-based artillery. Small penguins, big explosions.</p>
     <p class="small center hidden" id="iosTip">iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
@@ -71,14 +71,13 @@
 </div>
 
 <!-- ===== Match settings sheet ===== -->
-<div id="setup" class="overlay sheet hidden">
+<div id="setup" class="overlay sheet side hidden">
   <div class="panel sheet-panel">
     <div class="sheet-head"><h2>Match settings</h2><button class="iconbtn close" data-close="setup" aria-label="Close">✕</button></div>
-    <div class="sheet-body">
+    <div class="sheet-body compact">
       <section>
-        <h3>Teams</h3>
-        <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
-        <div class="row"><label>Critters each</label><div class="seg" id="perTeam"></div></div>
+        <div class="row"><label>Teams</label><div class="seg tight" id="numTeams"></div></div>
+        <div class="row"><label>Critters each</label><div class="seg tight" id="perTeam"></div></div>
         <div id="teamList"></div>
       </section>
       <section>
@@ -88,15 +87,17 @@
           <div class="imgtools"><button type="button" id="mapPick" class="secondary sm">Choose image</button><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif" hidden>
             <button type="button" id="mapFlipH" class="secondary sm" aria-label="Flip horizontally" title="Flip horizontally">⇄</button><button type="button" id="mapFlipV" class="secondary sm" aria-label="Flip vertically" title="Flip vertically">⇅</button><button type="button" id="mapRotL" class="secondary sm" aria-label="Turn left" title="Turn a quarter left">↺</button><button type="button" id="mapRotR" class="secondary sm" aria-label="Turn right" title="Turn a quarter right">↻</button><canvas id="mapThumb" width="144" height="72"></canvas></div></div>
         <p class="small" id="mapNote"></p>
+      </section>
+      <section>
         <h3>Theme</h3>
         <div class="chips" id="theme"></div>
       </section>
       <section>
         <h3>Scheme</h3>
-        <div class="cards" id="scheme"></div>
+        <div class="chips" id="scheme"></div>
+        <p class="small" id="schemeNote"></p>
       </section>
       <section>
-        <h3>Timing</h3>
         <div class="row"><label>Turn time</label><div class="stepper" id="turnTime"></div></div>
         <div class="row"><label>Sudden death</label><div class="stepper" id="sdMinutes"></div></div>
       </section>
@@ -106,7 +107,7 @@
 </div>
 
 <!-- ===== Online sheet ===== -->
-<div id="online" class="overlay sheet hidden">
+<div id="online" class="overlay sheet center hidden">
   <div class="panel sheet-panel narrow" id="onlineBox">
     <div class="sheet-head"><h2>Play online</h2><button class="iconbtn close" data-close="online" aria-label="Close">✕</button></div>
     <div class="sheet-body">
@@ -119,7 +120,7 @@
 </div>
 
 <!-- ===== Profile sheet ===== -->
-<div id="profile" class="overlay sheet hidden">
+<div id="profile" class="overlay sheet center hidden">
   <div class="panel sheet-panel narrow">
     <div class="sheet-head"><h2>Your profile</h2><button class="iconbtn close" data-close="profile" aria-label="Close">✕</button></div>
     <div class="sheet-body">

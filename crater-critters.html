@@ -85,7 +85,10 @@
   .profile canvas{width:32px;height:32px}
   .profile span{font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis}
   .h-hero{text-align:center;padding:0 16px}
-  #mascot{display:block;margin:0 auto 6px;max-width:100%;height:84px;width:auto;filter:drop-shadow(0 8px 12px rgba(0,0,0,.35))}
+  #mascot{display:block;margin:0 auto 4px;max-width:100%;height:116px;width:auto;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4))}
+  #menu>*{transition:opacity .2s}
+  #menu.peek{background:none}
+  #menu.peek>*{opacity:0;pointer-events:none}
   h1.logo{margin:0;font-size:clamp(34px,6vw,56px);line-height:1;font-weight:800;letter-spacing:-1.5px;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.55)}
   .tag{margin:10px 0 0;color:var(--muted);font-size:15px;text-shadow:0 2px 12px rgba(0,0,0,.5)}
   #iosTip{margin-top:10px}
@@ -96,18 +99,39 @@
   .h-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
   .h-actions .primary{min-width:220px}
   .h-actions .secondary{height:52px;padding:0 24px}
-  /* ---- sheets (match settings, online, profile) ---- */
-  .overlay.sheet{align-items:center}
-  .sheet-panel{width:min(720px,94vw);padding:0;display:flex;flex-direction:column;max-height:88vh;transform:translateY(16px);opacity:0;transition:transform .18s ease-out,opacity .18s ease-out}
+  /* ---- sheets: match settings docks to the left edge so the map stays in view; online/profile are small centred dialogs ---- */
+  .overlay.sheet.side{align-items:stretch;justify-content:flex-start;padding:0;background:none}
+  .overlay.sheet.center{align-items:center;justify-content:center}
+  .sheet-panel{padding:0;display:flex;flex-direction:column;opacity:0;transition:transform .2s ease-out,opacity .2s ease-out}
+  .side .sheet-panel{width:min(400px,94vw);max-width:none;max-height:none;border-radius:0;border-width:0 1px 0 0;box-shadow:12px 0 40px rgba(2,6,16,.45);transform:translateX(-28px)}
+  .center .sheet-panel{width:min(420px,94vw);max-height:88vh;transform:translateY(16px)}
   .sheet.open .sheet-panel{transform:none;opacity:1}
-  .sheet-panel.narrow{width:min(420px,94vw)}
-  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px 24px;border-bottom:1px solid var(--line)}
-  .sheet-head h2{margin:0;text-align:left;font-size:19px}
-  .sheet-body{padding:16px 24px;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top)) 12px 8px 20px;border-bottom:1px solid var(--line)}
+  .sheet-head h2{margin:0;text-align:left;font-size:17px}
+  .sheet-body{padding:16px 24px;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;flex:1}
   .sheet-body section{padding:4px 0 14px;margin-bottom:10px;border-bottom:1px solid var(--line)}
   .sheet-body section:last-child{border-bottom:0;margin-bottom:0}
-  .sheet-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 24px 16px;border-top:1px solid var(--line)}
-  .sheet-foot .primary{height:44px;padding:0 28px;box-shadow:none}
+  .sheet-foot{display:flex;justify-content:flex-end;gap:10px;padding:10px 20px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .sheet-foot .primary{height:42px;padding:0 26px;box-shadow:none}
+  .sheet-foot .secondary{height:42px}
+  /* compact settings: small labels, tight rows, chips for every choice */
+  .sheet-body.compact{padding:8px 20px 12px}
+  .sheet-body.compact section{padding:6px 0 10px;margin-bottom:4px}
+  .sheet-body.compact h3{margin:0 0 6px;font-size:12px}
+  .sheet-body.compact .row{margin:4px 0;gap:8px;flex-wrap:nowrap}
+  .sheet-body.compact .row>label{min-width:90px;font-size:13px}
+  .sheet-body.compact .chips{gap:5px;margin-bottom:4px}
+  .sheet-body.compact .chip{height:30px;padding:0 11px;font-size:12.5px}
+  .sheet-body.compact .small{font-size:12px;margin:4px 0 2px;min-height:0}
+  .sheet-body.compact .team{margin:5px 0;padding:3px 6px 3px 5px;gap:8px;grid-template-columns:26px 1fr auto}
+  .sheet-body.compact .swatch{width:26px;height:26px}
+  .sheet-body.compact .team input{height:30px;font-size:13px}
+  .sheet-body.compact .seg{padding:2px}
+  .sheet-body.compact .seg button{height:26px;min-width:30px;padding:0 8px;font-size:13px}
+  .sheet-body.compact .seg.tight button{min-width:26px;padding:0 5px}
+  .sheet-body.compact .stepper button{width:32px;height:30px;font-size:16px}
+  .sheet-body.compact .stepper output{min-width:88px;font-size:13px}
+  .sheet-body.compact .imgtools button.sm{height:28px;padding:0 9px}
   .or{text-align:center;color:var(--faint);font-size:13px;margin:14px 0}
   .joinrow{display:flex;gap:8px}
   .joinrow input{flex:1;text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:700;font-size:18px}
@@ -200,7 +224,7 @@
   .quick button{height:28px;padding:0 10px;font-size:13px}
   @media (prefers-reduced-motion:reduce){button,#touch button,.sheet-panel{transition:none}.msg{animation-duration:0s}}
   @media (max-height:420px){ #touch button{width:48px;height:48px} #touch .dpad{transform:scale(.86);transform-origin:left bottom} #touch .acts{transform:scale(.86);transform-origin:right bottom} .h-hero #mascot{display:none} }
-  @media (max-width:680px){ .help{columns:1} .panel{padding:18px 18px 20px} .overlay.sheet{align-items:flex-end;padding:0} .sheet-panel{width:100%;max-width:100%;border-radius:var(--r-panel) var(--r-panel) 0 0;max-height:92vh;transform:translateY(40px)} .sheet-foot{padding-bottom:calc(16px + env(safe-area-inset-bottom))} .h-actions{flex-direction:column;width:100%} .h-actions .primary,.h-actions .secondary{width:100%} .row>label{min-width:96px} button.iconbtn span{display:none} }
+  @media (max-width:680px){ .help{columns:1} .panel{padding:18px 18px 20px} .overlay.sheet.side,.overlay.sheet.center{align-items:flex-end;justify-content:center;padding:0} .sheet-panel,.side .sheet-panel,.center .sheet-panel{width:100%;max-width:100%;border-radius:var(--r-panel) var(--r-panel) 0 0;border-width:1px 0 0;box-shadow:var(--shadow);max-height:88vh;transform:translateY(40px)} .side .sheet-panel{max-height:66vh} .sheet-head{padding-top:12px} .h-actions{flex-direction:column;width:100%} .h-actions .primary,.h-actions .secondary{width:100%} .row>label{min-width:96px} button.iconbtn span{display:none} }
 </style>
 </head>
 <body>
@@ -244,7 +268,7 @@
     </div>
   </header>
   <div class="h-hero">
-    <canvas id="mascot" width="420" height="96"></canvas>
+    <canvas id="mascot" width="1040" height="264"></canvas>
     <h1 class="logo">Crater Critters</h1>
     <p class="tag">Turn-based artillery. Small penguins, big explosions.</p>
     <p class="small center hidden" id="iosTip">iPhone: tap <b>Share → Add to Home Screen</b> to play fullscreen without the address bar.</p>
@@ -259,14 +283,13 @@
 </div>
 
 <!-- ===== Match settings sheet ===== -->
-<div id="setup" class="overlay sheet hidden">
+<div id="setup" class="overlay sheet side hidden">
   <div class="panel sheet-panel">
     <div class="sheet-head"><h2>Match settings</h2><button class="iconbtn close" data-close="setup" aria-label="Close">✕</button></div>
-    <div class="sheet-body">
+    <div class="sheet-body compact">
       <section>
-        <h3>Teams</h3>
-        <div class="row"><label>Teams</label><div class="seg" id="numTeams"></div></div>
-        <div class="row"><label>Critters each</label><div class="seg" id="perTeam"></div></div>
+        <div class="row"><label>Teams</label><div class="seg tight" id="numTeams"></div></div>
+        <div class="row"><label>Critters each</label><div class="seg tight" id="perTeam"></div></div>
         <div id="teamList"></div>
       </section>
       <section>
@@ -276,15 +299,17 @@
           <div class="imgtools"><button type="button" id="mapPick" class="secondary sm">Choose image</button><input type="file" id="mapFile" accept="image/png,image/webp,image/jpeg,image/gif" hidden>
             <button type="button" id="mapFlipH" class="secondary sm" aria-label="Flip horizontally" title="Flip horizontally">⇄</button><button type="button" id="mapFlipV" class="secondary sm" aria-label="Flip vertically" title="Flip vertically">⇅</button><button type="button" id="mapRotL" class="secondary sm" aria-label="Turn left" title="Turn a quarter left">↺</button><button type="button" id="mapRotR" class="secondary sm" aria-label="Turn right" title="Turn a quarter right">↻</button><canvas id="mapThumb" width="144" height="72"></canvas></div></div>
         <p class="small" id="mapNote"></p>
+      </section>
+      <section>
         <h3>Theme</h3>
         <div class="chips" id="theme"></div>
       </section>
       <section>
         <h3>Scheme</h3>
-        <div class="cards" id="scheme"></div>
+        <div class="chips" id="scheme"></div>
+        <p class="small" id="schemeNote"></p>
       </section>
       <section>
-        <h3>Timing</h3>
         <div class="row"><label>Turn time</label><div class="stepper" id="turnTime"></div></div>
         <div class="row"><label>Sudden death</label><div class="stepper" id="sdMinutes"></div></div>
       </section>
@@ -294,7 +319,7 @@
 </div>
 
 <!-- ===== Online sheet ===== -->
-<div id="online" class="overlay sheet hidden">
+<div id="online" class="overlay sheet center hidden">
   <div class="panel sheet-panel narrow" id="onlineBox">
     <div class="sheet-head"><h2>Play online</h2><button class="iconbtn close" data-close="online" aria-label="Close">✕</button></div>
     <div class="sheet-body">
@@ -307,7 +332,7 @@
 </div>
 
 <!-- ===== Profile sheet ===== -->
-<div id="profile" class="overlay sheet hidden">
+<div id="profile" class="overlay sheet center hidden">
   <div class="panel sheet-panel narrow">
     <div class="sheet-head"><h2>Your profile</h2><button class="iconbtn close" data-close="profile" aria-label="Close">✕</button></div>
     <div class="sheet-body">
@@ -3326,18 +3351,37 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
+function mixHex(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; }
 function makeBackground(seed, cavern) {
   const rng = mulberry32(seed ^ 0x5bd1e995), n = noise1(rng);
-  const layers = [];
-  const th = Terrain.theme, specs = cavern
-    ? [{ p: 0.12, col: '#2a2140', amp: 160, base: 0.55, f: 180 }, { p: 0.28, col: '#3a2d55', amp: 120, base: 0.7, f: 110 }]
-    : [{ p: 0.12, col: th.layers[0], amp: 220, base: 0.62, f: 260 }, { p: 0.25, col: th.layers[1], amp: 160, base: 0.72, f: 150 }, { p: 0.4, col: th.layers[2], amp: 90, base: 0.82, f: 90 }];
-  specs.forEach((s, i) => { const h = new Float32Array(1024); for (let k = 0; k < 1024; k++) h[k] = (fbm(n, k * 8 / s.f + i * 100, 3) * 0.5 + 0.5) * s.amp; layers.push({ ...s, h }); });
-  const clouds = Array.from({ length: 14 }, () => ({ x: rand(0, 3000), y: rand(30, 300), s: rand(0.6, 1.5), v: rand(6, 16) }));
-  return { layers, clouds, cavern };
+  const th = Terrain.theme, sky = th.sky[1];
+  // ridges far to near: the far ones sit higher, scroll less and fade into the sky (aerial perspective)
+  const specs = cavern
+    ? [{ p: 0.06, col: '#1d1830', amp: 200, base: 0.5, f: 300, haze: 0 }, { p: 0.14, col: '#2a2140', amp: 160, base: 0.6, f: 180, haze: 0 }, { p: 0.3, col: '#3a2d55', amp: 120, base: 0.72, f: 110, haze: 0 }]
+    : [{ p: 0.05, col: th.layers[0], amp: 250, base: 0.55, f: 440, haze: 0.55 }, { p: 0.12, col: th.layers[0], amp: 220, base: 0.63, f: 260, haze: 0.3 },
+       { p: 0.25, col: th.layers[1], amp: 160, base: 0.73, f: 150, haze: 0.12 }, { p: 0.42, col: th.layers[2], amp: 90, base: 0.84, f: 90, haze: 0 }];
+  const layers = specs.map((s, i) => {
+    const h = new Float32Array(1024); for (let k = 0; k < 1024; k++) h[k] = (fbm(n, k * 8 / s.f + i * 100, 3) * 0.5 + 0.5) * s.amp;
+    return { ...s, h, fill: cavern ? s.col : mixHex(s.col, sky, s.haze), rim: `rgba(255,255,255,${cavern ? 0.05 : 0.1 + s.haze * 0.14})` };
+  });
+  const clouds = Array.from({ length: 16 }, () => ({ x: rand(0, 3000), y: rand(20, 320), s: rand(0.6, 1.6), v: rand(4, 12), p: rand(0.15, 0.35) }));
+  const fog = Array.from({ length: 21 }, (_, i) => ({ x: rand(0, 2600), band: i % 3, rx: rand(150, 340), ry: rand(18, 42), v: rand(3, 9), a: rand(0.5, 1) }));
+  return { layers, clouds, fog, cavern };
+}
+// Soft fog banks: wide flat blobs drifting slowly along the foot of a ridge
+function drawFog(band, y, p) {
+  const { w } = view, th = Terrain.theme, cav = bg.cavern, span = w + 900;
+  const col = cav ? '40,30,70' : th.lava ? '110,70,80' : hexToRgb(th.sky[2]).join(',');
+  for (const f of bg.fog) {
+    if (f.band !== band) continue;
+    const x = ((f.x - cam.x * p + g.time * f.v) % span + span) % span - 450, a = (cav ? 0.16 : 0.24) * f.a;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, f.ry / f.rx);
+    const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, f.rx); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, f.rx, 0, 7); ctx.fill(); ctx.restore();
+  }
 }
 function drawBackground() {
-  const { w, h } = view, cav = bg && bg.cavern;
+  const { w, h } = view, cav = bg && bg.cavern, z = cam.zoom, dy = cam.y - 600;
   const gr = ctx.createLinearGradient(0, 0, 0, h);
   if (cav) { gr.addColorStop(0, '#120c22'); gr.addColorStop(1, '#2e2148'); }
   else if (g.sd) { gr.addColorStop(0, '#5a2a4a'); gr.addColorStop(0.6, '#e07a5f'); gr.addColorStop(1, '#f2cc8f'); }
@@ -3345,33 +3389,33 @@ function drawBackground() {
   ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
   if (!bg) return;
   const th = Terrain.theme;
-  if (!cav) { // sun
-    const sx = w * 0.8 - cam.x * 0.03, sy = h * 0.2;
-    ctx.fillStyle = th.lava ? 'rgba(255,120,60,0.3)' : 'rgba(255,240,180,0.35)'; ctx.beginPath(); ctx.arc(sx, sy, 70 + Math.sin(g.time) * 4, 0, 7); ctx.fill();
-    ctx.fillStyle = th.sun; ctx.beginPath(); ctx.arc(sx, sy, 42, 0, 7); ctx.fill();
+  if (!cav) { // sun with a soft halo
+    const sx = w * 0.8 - cam.x * 0.03, sy = h * 0.2 - dy * 0.02, R = 200;
+    const halo = ctx.createRadialGradient(sx, sy, 20, sx, sy, R); halo.addColorStop(0, th.lava ? 'rgba(255,120,60,0.45)' : 'rgba(255,240,190,0.5)'); halo.addColorStop(0.35, th.lava ? 'rgba(255,120,60,0.14)' : 'rgba(255,240,190,0.16)'); halo.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.fillStyle = halo; ctx.fillRect(sx - R, sy - R, R * 2, R * 2);
+    ctx.fillStyle = th.sun; ctx.beginPath(); ctx.arc(sx, sy, 42 + Math.sin(g.time) * 1.5, 0, 7); ctx.fill();
   } else { // glowing crystals in the cave wall
     for (let i = 0; i < 30; i++) { const x = ((i * 397 - cam.x * 0.08) % (w + 100) + w + 100) % (w + 100) - 50, y = (i * 211) % h;
       ctx.fillStyle = `rgba(150,120,255,${0.15 + 0.1 * Math.sin(g.time * 2 + i)})`; ctx.beginPath(); ctx.arc(x, y, 3 + (i % 3), 0, 7); ctx.fill(); }
   }
-  // clouds (parallax 0.3, drift with wind)
-  if (!cav) for (const c of bg.clouds) {
-    const span = w + 600, x = ((c.x - cam.x * 0.3) % span + span) % span - 300, y = c.y - (cam.y - 600) * 0.15;
-    ctx.fillStyle = th.cloud;
+  // clouds: each at its own depth, the far ones fainter, all drifting slowly
+  if (!cav) { for (const c of bg.clouds) {
+    const span = w + 600, x = ((c.x - cam.x * c.p + g.time * c.v * 0.3) % span + span) % span - 300, y = c.y - dy * c.p * 0.5;
+    ctx.fillStyle = th.cloud; ctx.globalAlpha = 0.45 + c.p * 1.6;
     for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + k * 26 * c.s, y + Math.sin(k * 2) * 6 * c.s, (22 - Math.abs(k - 1.5) * 4) * c.s, 0, 7); ctx.fill(); }
-  }
-  // mountains / cave silhouettes
-  for (const L of bg.layers) {
-    ctx.fillStyle = L.col; ctx.beginPath();
-    const baseY = h * L.base - (cam.y - 600) * L.p * cam.zoom;
+  } ctx.globalAlpha = 1; }
+  // ridges far to near: a lit crest on each, and a fog bank lying in the valley in front of it
+  bg.layers.forEach((L, i) => {
+    const baseY = h * L.base - dy * L.p * z, crest = () => { for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, baseY - L.h[k]); } };
     if (cav) { // stalactites from the top
-      ctx.moveTo(0, 0);
-      for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, (1 - L.base) * h * 0.4 + L.h[k] * 0.8 - (cam.y - 600) * L.p * 0.3); }
-      ctx.lineTo(w, 0); ctx.closePath(); ctx.fill(); ctx.beginPath();
+      ctx.fillStyle = L.fill; ctx.beginPath(); ctx.moveTo(0, 0);
+      for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, (1 - L.base) * h * 0.4 + L.h[k] * 0.8 - dy * L.p * 0.3); }
+      ctx.lineTo(w, 0); ctx.closePath(); ctx.fill();
     }
-    ctx.moveTo(0, h);
-    for (let sx = 0; sx <= w + 8; sx += 8) { const k = (((sx + cam.x * L.p) / 8) | 0) & 1023; ctx.lineTo(sx, baseY - L.h[k]); }
-    ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
-  }
+    ctx.fillStyle = L.fill; ctx.beginPath(); ctx.moveTo(0, h); crest(); ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = L.rim; ctx.lineWidth = 1; ctx.beginPath(); crest(); ctx.stroke();
+    if (i >= 1) drawFog(i - 1, baseY + 8, L.p * 1.3);
+  });
   // weather: drifting snowflakes / rising embers (screen space, purely decorative)
   if (th.flakes && !cav) { ctx.fillStyle = 'rgba(255,255,255,0.8)';
     for (let i = 0; i < 60; i++) { const sp = 18 + (i % 5) * 9, x = ((i * 173 + Math.sin(g.time * 0.7 + i) * 30 + g.wind * g.time * 40 - cam.x * 0.2) % (w + 40) + w + 40) % (w + 40) - 20, y = ((i * 97 + g.time * sp) % (h + 20) + h + 20) % (h + 20) - 10;
@@ -4094,7 +4138,8 @@ const UI = {
     chips('theme', [['Meadow', 'Meadow'], ['Snow', 'Snow'], ['Desert', 'Desert'], ['Volcanic', 'Volcanic'], ['Random', 'Random']], 'theme', startBackdrop);
     { const el = $('scheme'); el.innerHTML = '';
       for (const [v, sub] of [['Classic', 'Balanced arsenal, crates and mines'], ['Melee Only', 'Close-range brawl, no artillery'], ['Chaos Crates', 'Everything, lots of it, crates every turn'], ['Artillery', 'Long range only, no mines']]) {
-        const b = document.createElement('button'); b.className = 'card' + (settings.scheme === v ? ' on' : ''); b.innerHTML = `<b></b><span></span>`; b.firstChild.textContent = v; b.lastChild.textContent = sub;
+        const b = document.createElement('button'); b.className = 'chip' + (settings.scheme === v ? ' on' : ''); b.textContent = v;
+        if (settings.scheme === v) $('schemeNote').textContent = sub;
         b.onclick = () => { settings.scheme = v; saveSettings(); T.buildMenu(); }; el.appendChild(b); } }
     const stepper = (id, vals, key, label) => { const el = $(id); el.innerHTML = ''; let i = vals.indexOf(settings[key]); if (i < 0) { i = 0; settings[key] = vals[0]; }
       const mk = (txt, d) => { const b = document.createElement('button'); b.textContent = txt; b.disabled = i + d < 0 || i + d >= vals.length; b.setAttribute('aria-label', d < 0 ? 'Less' : 'More'); b.onclick = () => { settings[key] = vals[i + d]; saveSettings(); T.buildMenu(); }; return b; };
@@ -4111,10 +4156,10 @@ const UI = {
     if (g) { const av = $('avatar').getContext('2d'); av.clearRect(0, 0, 36, 36); const m = new Critter({ color: TEAM_COLORS[settings.teams[0].color] }, '');
       Object.assign(m, { x: 18, y: 19, r: 9, facing: 1, mode: 'ground', alive: true, blinkT: 2 }); drawCritter(av, m, 0); }
   },
-  openSheet(id) { $(id).classList.remove('hidden'); requestAnimationFrame(() => $(id).classList.add('open')); },
-  closeSheet(id) { $(id).classList.remove('open'); $(id).classList.add('hidden'); this.buildMenu(); },
+  openSheet(id) { const el = $(id); el.classList.remove('hidden'); $('menu').classList.toggle('peek', id === 'setup'); void el.offsetWidth; el.classList.add('open'); },   // the reflow lets the slide-in transition run even when frames are throttled
+  closeSheet(id) { $(id).classList.remove('open'); $(id).classList.add('hidden'); $('menu').classList.remove('peek'); this.buildMenu(); },
   showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); startBackdrop(); this.buildMenu(); },
-  hideAll() { ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board', 'setup', 'online', 'profile'].forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('open'); }); this.pickerOpen = this.paused = this.helpOpen = false; },
+  hideAll() { $('menu').classList.remove('peek'); ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board', 'setup', 'online', 'profile'].forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('open'); }); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
     if (!(g.state === 'turn' && g.controlling && !g.ai && !g.fired && !g.lockWeapon && !this.paused && myTurn())) return;
@@ -4210,17 +4255,111 @@ $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinB
 $('lobbyCancel').onclick = () => UI.showMenu();
 $('menuBtn').onclick = () => UI.showMenu();
 
-// little animated mascot line-up on the menu
-const mascotCtx = $('mascot').getContext('2d');
-const mascots = [0, 1, 2, 3].map(i => Object.assign(new Critter({ color: TEAM_COLORS[i] }, ''), { x: 70 + i * 93, y: 62, facing: i < 2 ? 1 : -1, mode: 'ground', r: 18 }));
+// The home-screen squad: four penguins kitted out for battle, standing at ease (no hopping).
+// Each is unique: army helmet + bazooka, bandana + bomb, beret + shotgun, steel helm + grenade.
+// Drawn at 2x so the edges stay crisp on dense screens.
+const MASCOT_W = 520, MASCOT_H = 132, MASCOT_S = 2;
+const mascotCtx = (() => { const c = $('mascot'); c.width = MASCOT_W * MASCOT_S; c.height = MASCOT_H * MASCOT_S; return c.getContext('2d'); })();
+const mascots = [0, 1, 2, 3].map(i => Object.assign(new Critter({ color: TEAM_COLORS[i] }, ''),
+  { x: 84 + i * 118, y: 90, facing: i < 2 ? 1 : -1, mode: 'ground', r: 21, alive: true, gear: ['bazooka', 'bomb', 'shotgun', 'grenade'][i], seed: i * 2.3 }));
 function drawMascots(t) {
-  const x = mascotCtx; x.clearRect(0, 0, 420, 96);
+  const x = mascotCtx; x.setTransform(MASCOT_S, 0, 0, MASCOT_S, 0, 0); x.clearRect(0, 0, MASCOT_W, MASCOT_H);
   mascots.forEach((m, i) => {
     m.team.color = TEAM_COLORS[(settings.teams[i] || { color: i }).color];
-    const hop = Math.max(0, Math.sin(t * 3 + i * 1.3)); m.y = 62 - hop * 18; m.squash = hop < 0.1 ? 0.15 : -0.05;
-    m.px = Math.sin(t * 5 + i) * 1.5; m.py = Math.cos(t * 4 + i) * 1.2 + 0.5; m.hurtT = (t + i) % 6 < 0.4 ? 1 : 0; m.blinkT = ((t * 0.9 + i * 1.7) % 3.3); m.face = m.hurtT ? 1 : 0; m.faceT = m.hurtT;
-    drawCritter(x, m, t);
+    m.squash = 0; m.hurtT = 0; m.face = 0; m.faceT = 0;
+    // eyes scan the horizon, the odd blink; the body breathes inside drawCritter
+    m.px = Math.sin(t * 0.6 + i * 1.9) * 1.6; m.py = Math.cos(t * 0.45 + i) * 0.6 + 0.3; m.blinkT = (t * 0.8 + i * 1.7) % 3.7;
+    drawGear(x, m, t, true); drawCritter(x, m, t); drawGear(x, m, t, false);
   });
+}
+// Gear is drawn in the penguin's own frame (facing +x, same breathing squash as the body):
+// `behind` for what sits past the far shoulder, then in front after the body
+function drawGear(x, m, t, behind) {
+  const r = m.r, br = Math.sin(t * 3 + m.seed) * 0.03, col = m.team.color;
+  x.save(); x.translate(m.x, m.y); x.translate(0, r); x.scale(1 + br, 1 - br); x.translate(0, -r); x.scale(m.facing, 1);
+  x.lineJoin = 'round'; x.lineCap = 'round'; x.strokeStyle = '#121420'; x.lineWidth = 1.3;
+  const grad = (x0, y0, x1, y1, a, b) => { const gr = x.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, a); gr.addColorStop(1, b); return gr; };
+  const flipper = ang => { x.fillStyle = '#2a2f42'; x.strokeStyle = '#121420'; x.lineWidth = 1.2; x.save(); x.translate(r * 0.15, -r * 0.1); x.rotate(ang); x.beginPath(); x.ellipse(0, r * 0.52, r * 0.22, r * 0.6, 0, 0, 7); x.fill(); x.stroke(); x.restore(); };
+  const brows = k => { x.strokeStyle = '#121420'; x.lineWidth = 1.7; x.beginPath(); x.moveTo(-r * 0.1, -r * (0.94 - k)); x.lineTo(r * 0.47, -r * 0.8); x.moveTo(r * 0.5, -r * 0.8); x.lineTo(r * 0.92, -r * (0.7 + k)); x.stroke(); };
+  const dome = (fill, line, ry = 0.66) => { // a helmet shell over the crown, brim just above the eyes
+    x.save(); x.translate(r * 0.08, -r * 0.86); x.fillStyle = fill; x.strokeStyle = line; x.lineWidth = 1.4;
+    x.beginPath(); x.ellipse(0, 0, r * 1.02, r * ry, 0, Math.PI, 0); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = 'rgba(255,255,255,0.2)'; x.beginPath(); x.ellipse(-r * 0.32, -r * ry * 0.55, r * 0.3, r * 0.1, -0.35, 0, 7); x.fill();
+    x.fillStyle = line; x.beginPath(); x.ellipse(0, 0, r * 1.1, r * 0.13, 0, 0, 7); x.fill(); x.restore(); };
+  switch (m.gear) {
+    case 'bazooka':
+      if (!behind) { // launcher held at the hip, pointing up and forward; army helmet with a chin strap
+        x.save(); x.translate(-r * 0.3, r * 0.5); x.rotate(-0.28);
+        rr(x, -r * 1.2, -r * 0.22, r * 2.7, r * 0.44, r * 0.1); fs(x, grad(0, -r * 0.22, 0, r * 0.22, '#8a9868', '#3d4729'));
+        rr(x, -r * 1.25, -r * 0.3, r * 0.42, r * 0.6, r * 0.08); fs(x, '#2f3626');
+        rr(x, r * 1.1, -r * 0.3, r * 0.48, r * 0.6, r * 0.08); fs(x, '#2f3626');
+        x.beginPath(); x.moveTo(r * 1.58, -r * 0.14); x.lineTo(r * 2.05, 0); x.lineTo(r * 1.58, r * 0.14); x.closePath(); fs(x, '#e63946');   // rocket nose peeking out
+        rr(x, r * 0.15, r * 0.2, r * 0.22, r * 0.45, 2); fs(x, '#2b1d12');   // grip
+        x.strokeStyle = 'rgba(255,255,255,0.3)'; x.lineWidth = 1; x.beginPath(); x.moveTo(-r * 1.0, -r * 0.1); x.lineTo(r * 1.0, -r * 0.1); x.stroke();
+        x.restore();
+        flipper(-1.35); brows(0.05); dome(grad(-r, -r * 1.5, r, -r * 0.8, '#95a56a', '#4e5a33'), '#343d22');
+        x.strokeStyle = '#343d22'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(r * 1.0, -r * 0.82); x.quadraticCurveTo(r * 1.05, -r * 0.3, r * 0.55, r * 0.02); x.stroke();   // chin strap
+        x.fillStyle = '#c9d2a0'; x.fillRect(-r * 0.55, -r * 1.3, r * 0.3, r * 0.1);
+      }
+      break;
+    case 'bomb':
+      if (!behind) { // a classic round bomb hugged in front, fuse sparking; deep red bandana
+        x.save(); x.translate(r * 0.6, r * 0.12);
+        const g2 = x.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.05, 0, 0, r * 0.64); g2.addColorStop(0, '#5a6078'); g2.addColorStop(0.6, '#262a3a'); g2.addColorStop(1, '#0e111c');
+        circ(x, 0, 0, r * 0.58); fs(x, g2);
+        rr(x, -r * 0.13, -r * 0.74, r * 0.26, r * 0.2, 2); fs(x, '#9aa3ad');
+        x.strokeStyle = '#d9c8a0'; x.lineWidth = 2; x.beginPath(); x.moveTo(0, -r * 0.74); x.quadraticCurveTo(r * 0.12, -r * 1.1, r * 0.45, -r * 1.05); x.stroke();
+        const sp = 0.6 + Math.sin(t * 23) * 0.4, fx = r * 0.45, fy = -r * 1.05;
+        x.fillStyle = `rgba(255,230,120,${0.45 + sp * 0.45})`; circ(x, fx, fy, 2.5 + sp * 2.5); x.fill();
+        x.fillStyle = '#ff9a3c'; circ(x, fx, fy, 1.3 + sp); x.fill();
+        x.strokeStyle = 'rgba(255,210,90,0.85)'; x.lineWidth = 1;
+        for (let k = 0; k < 5; k++) { const a = t * 11 + k * 1.26, l = 3.5 + sp * 3; x.beginPath(); x.moveTo(fx + Math.cos(a) * 2, fy + Math.sin(a) * 2); x.lineTo(fx + Math.cos(a) * l, fy + Math.sin(a) * l); x.stroke(); }
+        x.restore();
+        flipper(-1.2); brows(0.0);
+        // bandana: band across the forehead, knot and two tails fluttering behind
+        x.strokeStyle = '#121420'; x.lineWidth = r * 0.26; x.beginPath(); x.moveTo(-r * 0.95, -r * 0.84); x.quadraticCurveTo(r * 0.05, -r * 1.2, r * 1.0, -r * 0.84); x.stroke();
+        x.strokeStyle = '#c8233c'; x.lineWidth = r * 0.2; x.beginPath(); x.moveTo(-r * 0.95, -r * 0.84); x.quadraticCurveTo(r * 0.05, -r * 1.2, r * 1.0, -r * 0.84); x.stroke();
+        const fl = Math.sin(t * 5 + 1) * 2; x.fillStyle = '#c8233c'; x.strokeStyle = '#121420'; x.lineWidth = 1.2;
+        x.beginPath(); x.moveTo(-r * 0.9, -r * 0.9); x.lineTo(-r * 1.55, -r * 1.05 + fl); x.lineTo(-r * 1.45, -r * 0.7 + fl); x.closePath(); x.fill(); x.stroke();
+        x.beginPath(); x.moveTo(-r * 0.9, -r * 0.9); x.lineTo(-r * 1.5, -r * 0.55 - fl); x.lineTo(-r * 1.2, -r * 0.45 - fl); x.closePath(); x.fill(); x.stroke();
+        circ(x, -r * 0.92, -r * 0.88, r * 0.12); fs(x, '#a51a30');
+      }
+      break;
+    case 'shotgun':
+      if (!behind) { // double-barrel across the chest; a tilted beret in the team colour
+        x.save(); x.translate(-r * 0.05, r * 0.08); x.rotate(-0.4);
+        rr(x, -r * 1.3, -r * 0.18, r * 0.95, r * 0.38, 3); fs(x, grad(0, -r * 0.2, 0, r * 0.2, '#a3703d', '#5c3a1c'));
+        rr(x, -r * 0.45, -r * 0.24, r * 1.95, r * 0.22, 2); fs(x, grad(0, -r * 0.24, 0, 0, '#b4bdc8', '#6c7580'));
+        rr(x, -r * 0.45, 0, r * 1.95, r * 0.22, 2); fs(x, grad(0, 0, 0, r * 0.22, '#8e97a2', '#4a525c'));
+        x.fillStyle = '#2b1d12'; rr(x, -r * 0.25, r * 0.2, r * 0.24, r * 0.24, 2); x.fill();
+        x.restore();
+        flipper(-1.0); brows(0.12);
+        x.save(); x.translate(r * 0.05, -r * 1.2); x.rotate(-0.2);
+        x.beginPath(); x.ellipse(0, r * 0.12, r * 0.78, r * 0.16, 0, 0, 7); fs(x, shade(col, -0.45));   // band
+        x.beginPath(); x.ellipse(r * 0.1, -r * 0.08, r * 0.95, r * 0.32, 0, 0, 7); fs(x, grad(-r, -r * 0.4, r, 0, shade(col, 0.1), shade(col, -0.35)));
+        circ(x, r * 0.15, -r * 0.38, r * 0.07); x.fillStyle = shade(col, -0.5); x.fill(); x.restore();
+      }
+      break;
+    case 'grenade':
+      if (!behind) { // steel helm with a ridge and rivets; a pineapple grenade held up, pin still in
+        x.save(); x.translate(r * 0.95, -r * 0.4); x.rotate(0.15);
+        const g3 = x.createRadialGradient(-r * 0.12, -r * 0.15, r * 0.04, 0, 0, r * 0.5); g3.addColorStop(0, '#8aa05a'); g3.addColorStop(1, '#394523');
+        x.beginPath(); x.ellipse(0, r * 0.05, r * 0.36, r * 0.46, 0, 0, 7); fs(x, g3);
+        x.strokeStyle = 'rgba(0,0,0,0.4)'; x.lineWidth = 1;
+        for (let k = -1; k <= 1; k++) { x.beginPath(); x.moveTo(-r * 0.3, r * 0.05 + k * r * 0.2); x.lineTo(r * 0.3, r * 0.05 + k * r * 0.2); x.stroke(); }
+        x.beginPath(); x.moveTo(-r * 0.12, -r * 0.35); x.lineTo(-r * 0.12, r * 0.45); x.moveTo(r * 0.12, -r * 0.35); x.lineTo(r * 0.12, r * 0.45); x.stroke();
+        x.strokeStyle = '#121420'; rr(x, -r * 0.12, -r * 0.6, r * 0.24, r * 0.22, 2); fs(x, '#9aa3ad');   // cap
+        x.beginPath(); x.moveTo(r * 0.1, -r * 0.55); x.quadraticCurveTo(r * 0.5, -r * 0.5, r * 0.42, r * 0.1); x.lineWidth = 2.6; x.strokeStyle = '#121420'; x.stroke(); x.lineWidth = 1.4; x.strokeStyle = '#b8c1cc'; x.stroke();   // lever
+        x.strokeStyle = '#ffd23f'; x.lineWidth = 1.4; circ(x, -r * 0.22, -r * 0.62, r * 0.1); x.stroke();   // pin ring
+        x.restore();
+        flipper(-1.55); brows(0.08);
+        dome(grad(-r, -r * 1.5, r, -r * 0.8, '#b4bdc8', '#5a6370'), '#3a424c', 0.7);
+        x.strokeStyle = '#3a424c'; x.lineWidth = 2.2; x.beginPath(); x.moveTo(r * 0.08, -r * 1.56); x.lineTo(r * 0.08, -r * 1.2); x.stroke();   // ridge
+        x.fillStyle = '#d9dfe6'; for (const px of [-0.7, -0.25, 0.25, 0.7]) { circ(x, r * 0.08 + r * px, -r * 0.86, 1.3); x.fill(); }   // rivets
+      }
+      break;
+  }
+  x.restore();
 }
 
 // ============================== GAME STATE MACHINE ==============================
