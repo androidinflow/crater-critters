@@ -34,6 +34,7 @@ function newGame(cfg) {
   g = makeState(); g.online = !!cfg; Net.log = []; Net.events = []; g.perTeam = settings.perTeam || 4;
   const s = settings, sc = SCHEMES[s.scheme] || SCHEMES.Classic, seed = Math.random() * 1e9 | 0;
   g.scheme = sc; g.schemeName = s.scheme; g.seed = seed; g.mapStyle = resolveMap(s.map); g.theme = resolveTheme(s.theme);
+  MapImage.game = null; Net.mapData = g.mapStyle === 'Custom' ? MapImage.img.src : ''; Net.mapId = Net.mapData ? Math.random().toString(36).slice(2, 10) : '';
   Terrain.generate(g.mapStyle, seed, g.theme); bg = makeBackground(seed, Terrain.cavern);
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
   g.teams = (cfg ? cfg.teams : settings.teams.slice(0, s.numTeams)).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
@@ -49,7 +50,7 @@ function newGame(cfg) {
   cam.x = CFG.W / 2; cam.y = 600; cam.tz = fitZoom();
   banner('Critters, assemble!', '#ffd23f');
 }
-function resolveMap(m) { if (m === 'Custom') return !g.online && MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
+function resolveMap(m) { if (m === 'Custom') return MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
 function resolveTheme(t) { return THEMES[t] ? t : pick(THEME_NAMES); }
 function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)); }
 

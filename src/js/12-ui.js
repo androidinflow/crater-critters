@@ -172,9 +172,9 @@ const DEFAULT_SETTINGS = {
 const SETTINGS_KEY = 'craterCritters.settings.v1';
 // Custom image maps (beta): a picture from the player, fitted above the water line. Transparent
 // pixels are air (in a picture with no transparency at all, white is air); everything else is
-// ground painted with the picture's own colours. Kept in localStorage, local games only for now.
+// ground painted with the picture's own colours. Kept in localStorage; online, the host streams it to the guests.
 const MapImage = {
-  KEY: 'cc_custom_map', img: null,
+  KEY: 'cc_custom_map', img: null, game: null,   // game: the host's image while playing someone else's custom map online
   ready() { return !!(this.img && this.img.complete && this.img.naturalWidth > 0); },
   init(then) { let d = null; try { d = localStorage.getItem(this.KEY); } catch (e) { } if (d) this.setSrc(d, then); },
   setSrc(src, then) { const im = new Image(); im.onload = () => { this.img = im; if (then) then(true); }; im.onerror = () => { if (then) then(false); }; im.src = src; },
@@ -215,7 +215,7 @@ const MapImage = {
     x.drawImage(im, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
   },
   stamp(T) {
-    const im = this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
+    const im = this.game || this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
     const k = Math.min(maxW / im.naturalWidth, maxH / im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
     const x0 = Math.round((W - w) / 2), y0 = Math.round(CFG.WATER0 - 70 - h);
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d'); x.drawImage(im, 0, 0, w, h);
@@ -279,7 +279,7 @@ const UI = {
     stepper('turnTime', [20, 30, 45, 60, 90], 'turnTime', v => `${v} s`);
     stepper('sdMinutes', [3, 5, 10, 15, 0], 'sdMinutes', v => v ? `after ${v} min` : 'never');
     $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
-    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Your image works in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); for (const id of ['mapFlipH', 'mapFlipV', 'mapRotL', 'mapRotR']) $(id).disabled = !MapImage.ready(); }
+    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Online, your friends get your image when you host (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); for (const id of ['mapFlipH', 'mapFlipV', 'mapRotL', 'mapRotR']) $(id).disabled = !MapImage.ready(); }
     else $('mapNote').textContent = '';
     // home screen: summary line, profile chip with a tiny avatar in your colour
     const mapName = settings.map === 'Custom' ? 'your image' : settings.map;
@@ -290,7 +290,7 @@ const UI = {
   },
   openSheet(id) { const el = $(id); el.classList.remove('hidden'); $('menu').classList.toggle('peek', id === 'setup'); void el.offsetWidth; el.classList.add('open'); },   // the reflow lets the slide-in transition run even when frames are throttled
   closeSheet(id) { $(id).classList.remove('open'); $(id).classList.add('hidden'); $('menu').classList.remove('peek'); this.buildMenu(); },
-  showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); startBackdrop(); this.buildMenu(); },
+  showMenu() { MapImage.game = null; if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); startBackdrop(); this.buildMenu(); },
   hideAll() { $('menu').classList.remove('peek'); ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board', 'setup', 'online', 'profile'].forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('open'); }); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }

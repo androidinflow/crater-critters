@@ -55,4 +55,6 @@ is played by the AI until they rejoin with the same profile name.
 Map → "Custom image" lets a player pick a PNG/JPEG/WebP. Transparent pixels are air (in an
 image with no transparency, white is air); everything else is ground drawn in the image's
 own colours, fitted above the water line. The image is kept in localStorage on that device.
-Local games only for now: an online host with a custom map gets a random map instead.
+Online, the host streams the image to every guest in ~48 KB `mi` packets ahead of `init`;
+guests hold the `init` until all pieces arrive. Guests keep the image, so a rejoin skips the
+download and a guest that takes over hosting can pass it on.

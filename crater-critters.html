@@ -4040,9 +4040,9 @@ const DEFAULT_SETTINGS = {
 const SETTINGS_KEY = 'craterCritters.settings.v1';
 // Custom image maps (beta): a picture from the player, fitted above the water line. Transparent
 // pixels are air (in a picture with no transparency at all, white is air); everything else is
-// ground painted with the picture's own colours. Kept in localStorage, local games only for now.
+// ground painted with the picture's own colours. Kept in localStorage; online, the host streams it to the guests.
 const MapImage = {
-  KEY: 'cc_custom_map', img: null,
+  KEY: 'cc_custom_map', img: null, game: null,   // game: the host's image while playing someone else's custom map online
   ready() { return !!(this.img && this.img.complete && this.img.naturalWidth > 0); },
   init(then) { let d = null; try { d = localStorage.getItem(this.KEY); } catch (e) { } if (d) this.setSrc(d, then); },
   setSrc(src, then) { const im = new Image(); im.onload = () => { this.img = im; if (then) then(true); }; im.onerror = () => { if (then) then(false); }; im.src = src; },
@@ -4083,7 +4083,7 @@ const MapImage = {
     x.drawImage(im, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
   },
   stamp(T) {
-    const im = this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
+    const im = this.game || this.img, W = T.W, maxW = W - 200, maxH = CFG.WATER0 - 130;
     const k = Math.min(maxW / im.naturalWidth, maxH / im.naturalHeight), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
     const x0 = Math.round((W - w) / 2), y0 = Math.round(CFG.WATER0 - 70 - h);
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d'); x.drawImage(im, 0, 0, w, h);
@@ -4147,7 +4147,7 @@ const UI = {
     stepper('turnTime', [20, 30, 45, 60, 90], 'turnTime', v => `${v} s`);
     stepper('sdMinutes', [3, 5, 10, 15, 0], 'sdMinutes', v => v ? `after ${v} min` : 'never');
     $('mapFileRow').classList.toggle('hidden', settings.map !== 'Custom');
-    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Your image works in local games only (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); for (const id of ['mapFlipH', 'mapFlipV', 'mapRotL', 'mapRotR']) $(id).disabled = !MapImage.ready(); }
+    if (settings.map === 'Custom') { $('mapNote').textContent = MapImage.ready() ? 'Transparent or white pixels are air. Online, your friends get your image when you host (beta).' : 'Choose an image. Transparent or white pixels are air.'; MapImage.thumb(); for (const id of ['mapFlipH', 'mapFlipV', 'mapRotL', 'mapRotR']) $(id).disabled = !MapImage.ready(); }
     else $('mapNote').textContent = '';
     // home screen: summary line, profile chip with a tiny avatar in your colour
     const mapName = settings.map === 'Custom' ? 'your image' : settings.map;
@@ -4158,7 +4158,7 @@ const UI = {
   },
   openSheet(id) { const el = $(id); el.classList.remove('hidden'); $('menu').classList.toggle('peek', id === 'setup'); void el.offsetWidth; el.classList.add('open'); },   // the reflow lets the slide-in transition run even when frames are throttled
   closeSheet(id) { $(id).classList.remove('open'); $(id).classList.add('hidden'); $('menu').classList.remove('peek'); this.buildMenu(); },
-  showMenu() { if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); startBackdrop(); this.buildMenu(); },
+  showMenu() { MapImage.game = null; if (Net.role) { Net.send(Net.role === 'host' ? { t: 'bye', host: 1 } : { t: 'bye', pid: Net.pid }); Net.leave(); } Chat.reset(); this.hideAll(); $('menu').classList.remove('hidden'); startBackdrop(); this.buildMenu(); },
   hideAll() { $('menu').classList.remove('peek'); ['menu', 'picker', 'pause', 'help', 'over', 'lobby', 'board', 'setup', 'online', 'profile'].forEach(id => { $(id).classList.add('hidden'); $(id).classList.remove('open'); }); this.pickerOpen = this.paused = this.helpOpen = false; },
   togglePicker() {
     if (this.pickerOpen) { $('picker').classList.add('hidden'); this.pickerOpen = false; return; }
@@ -4398,6 +4398,7 @@ function newGame(cfg) {
   g = makeState(); g.online = !!cfg; Net.log = []; Net.events = []; g.perTeam = settings.perTeam || 4;
   const s = settings, sc = SCHEMES[s.scheme] || SCHEMES.Classic, seed = Math.random() * 1e9 | 0;
   g.scheme = sc; g.schemeName = s.scheme; g.seed = seed; g.mapStyle = resolveMap(s.map); g.theme = resolveTheme(s.theme);
+  MapImage.game = null; Net.mapData = g.mapStyle === 'Custom' ? MapImage.img.src : ''; Net.mapId = Net.mapData ? Math.random().toString(36).slice(2, 10) : '';
   Terrain.generate(g.mapStyle, seed, g.theme); bg = makeBackground(seed, Terrain.cavern);
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
   g.teams = (cfg ? cfg.teams : settings.teams.slice(0, s.numTeams)).map((t, i) => ({ name: t.name || `Team ${i + 1}`, color: TEAM_COLORS[t.color], ai: t.ai, critters: [], ammo: { ...sc.ammo }, cIdx: -1, idx: i, fuse: 3, lastWeapon: 'bomb', dmg: 0, kills: 0, used: {} }));
@@ -4413,7 +4414,7 @@ function newGame(cfg) {
   cam.x = CFG.W / 2; cam.y = 600; cam.tz = fitZoom();
   banner('Critters, assemble!', '#ffd23f');
 }
-function resolveMap(m) { if (m === 'Custom') return !g.online && MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
+function resolveMap(m) { if (m === 'Custom') return MapImage.ready() ? 'Custom' : pick(MAP_STYLES); return MAP_STYLES.includes(m) ? m : pick(MAP_STYLES); }
 function resolveTheme(t) { return THEMES[t] ? t : pick(THEME_NAMES); }
 function teamsAlive() { return g.teams.filter(t => t.critters.some(c => c.alive)); }
 
@@ -4728,6 +4729,7 @@ const Net = {
   role: null, ws: null, code: '', topic: '', ref: 1, joined: false, started: false, accepted: false,
   pid: '', myTeam: 0, peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, events: [], log: [], mute: 0,
   fp: 0, jp: 0, bp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, lostAt: 0, electT: 0, snapAt: 0, helloT: 0, roster: [], seenPeers: {}, epoch: 0,
+  mapData: '', mapId: '', parts: null, pendingInit: null,   // custom image map: the host's data URL, sent in chunks before `init`
   // ---- transport ----
   open() {
     const ws = this.ws = new WebSocket(`${SUPA.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SUPA.key}&vsn=1.0.0`);
@@ -4751,7 +4753,7 @@ const Net = {
   begin(code, role) {
     this.leave();
     Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, accepted: false, hostLost: false, lastHost: performance.now(),
-      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [], seenPeers: {}, epoch: 0, lostAt: 0, electT: 0,
+      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [], seenPeers: {}, epoch: 0, lostAt: 0, electT: 0, parts: null, pendingInit: null,
       pid: this.pid || this.storedPid() });
     // heartbeat on a timer (not the animation loop) so a backgrounded phone tab still counts as present
     this.hbTimer = setInterval(() => { if (this.joined) this.send(this.role === 'host' ? { t: 'hb', host: 1 } : { t: 'hb', pid: this.pid, team: this.myTeam }); }, 2000);
@@ -4810,9 +4812,17 @@ const Net = {
     newGame({ teams });
     this.sendInit();
   },
+  // Custom map: the image goes out in ~48 KB pieces just ahead of `init` (a broadcast packet has a size limit);
+  // a guest holds the init until every piece of that image id has arrived.
+  sendMapImage(to) {
+    const d = this.mapData, id = this.mapId, CH = 48000, n = Math.ceil(d.length / CH);
+    for (let i = 0; i < n; i++) this.send({ t: 'mi', host: 1, ep: this.epoch, to, id, i, n, d: d.slice(i * CH, (i + 1) * CH) });
+    return n;
+  },
   sendInit(to) {
+    if (g.mapStyle === 'Custom' && this.mapData) this.sendMapImage(to);
     const slots = {}; for (const k in this.peers) slots[k] = this.peers[k].team;
-    this.send({ t: 'init', host: 1, to, slots, ep: this.epoch, seed: g.seed, map: g.mapStyle, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: g.settings.turnTime, sdMinutes: g.settings.sdMinutes,
+    this.send({ t: 'init', host: 1, to, slots, ep: this.epoch, seed: g.seed, map: g.mapStyle, mapId: this.mapId, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: g.settings.turnTime, sdMinutes: g.settings.sdMinutes,
       teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
   },
   onMsg(m) {
@@ -4846,7 +4856,15 @@ const Net = {
       if (m.ep !== undefined && (m.ep | 0) < this.epoch) return;   // a packet from a host that has since been replaced
       if (m.host) { this.lastHost = now; if (this.hostLost) { this.hostLost = false; UI.netStatus('Host is back!'); } }
       switch (m.t) {
-        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.epoch = m.ep | 0; this.setupGuest(m); break;
+        case 'mi': if (m.to && m.to !== this.pid) return;
+          if (!this.parts || this.parts.id !== m.id) this.parts = { id: m.id, n: m.n, got: 0, d: [] };
+          if (this.parts.d[m.i] === undefined) { this.parts.d[m.i] = m.d; this.parts.got++; }
+          if (this.pendingInit && this.parts.got === this.parts.n) this.customInit(this.pendingInit);
+          break;
+        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.epoch = m.ep | 0;
+          if (m.map === 'Custom') { this.pendingInit = m; if (this.mapId === m.mapId && MapImage.game) this.customInit(m); else if (this.parts && this.parts.id === m.mapId && this.parts.got === this.parts.n) this.customInit(m); else UI.netStatus('Downloading the host\'s map…'); }
+          else { MapImage.game = null; this.setupGuest(m); }
+          break;
         case 'takeover': if (m.pid !== this.pid) { this.epoch = m.ep | 0; this.hostLost = false; this.lastHost = now; this.accepted = false; UI.netStatus(`${g.teams[m.team] ? g.teams[m.team].name : 'A friend'} is hosting now`); } break;
         case 'roster': this.accepted = true; this.roster = m.list || []; this.renderRoster(); if (!this.started && !m.started) UI.netStatus(`Joined! ${this.roster.length} in the room – waiting for the host to start…`); break;
         case 'full': if (m.to === this.pid) { this.accepted = true; UI.netStatus(m.playing ? `That game is already in progress. If you were in it, rejoin with the same name you used (${Profile.name()}).` : 'That room is full (8 players).'); } break;
@@ -4928,6 +4946,16 @@ const Net = {
       c: g.critters.map(c => [c.id, c.team.idx, c.name, ...CRIT_F.map(f => nr(c[f])), c.say ? [c.say.text, nr(c.say.t)] : 0]),
       e: g.ents.filter(e => !(e instanceof Critter) && !e.dead).map(e => { const k = NET_KIND.get(e.constructor); if (!k) return null; if (e instanceof Rope) e.cId = e.c.id;
         return [k.code, e.id, nr(e.x), nr(e.y), nr(e.vx || 0), nr(e.vy || 0), ...k.f.map(f => nr(e[f]))]; }).filter(Boolean) };
+  },
+  customInit(m) {   // all pieces in (or the image is already here from before a rejoin): decode, then build the world
+    this.pendingInit = null;
+    const go = () => { if (this.role !== 'guest') return; this.setupGuest(m); UI.netStatus(''); };
+    if (this.mapId === m.mapId && MapImage.game) return go();
+    const data = this.parts.d.join(''); this.parts = null;
+    const im = new Image();
+    im.onload = () => { MapImage.game = im; this.mapData = data; this.mapId = m.mapId; go(); };   // kept so this guest can pass it on if it ever hosts
+    im.onerror = () => UI.netStatus('Could not load the host\'s map image.');
+    im.src = data;
   },
   setupGuest(m) {
     UI.hideAll(); this.started = true; this.hostLost = false; this.myTeam = m.slots[this.pid];

@@ -25,6 +25,7 @@ const Net = {
   role: null, ws: null, code: '', topic: '', ref: 1, joined: false, started: false, accepted: false,
   pid: '', myTeam: 0, peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, events: [], log: [], mute: 0,
   fp: 0, jp: 0, bp: 0, lastIn: '', inT: 0, snapT: 0, hbT: 0, lastHost: 0, hostLost: false, lostAt: 0, electT: 0, snapAt: 0, helloT: 0, roster: [], seenPeers: {}, epoch: 0,
+  mapData: '', mapId: '', parts: null, pendingInit: null,   // custom image map: the host's data URL, sent in chunks before `init`
   // ---- transport ----
   open() {
     const ws = this.ws = new WebSocket(`${SUPA.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SUPA.key}&vsn=1.0.0`);
@@ -48,7 +49,7 @@ const Net = {
   begin(code, role) {
     this.leave();
     Object.assign(this, { role, code, topic: 'realtime:crater-critters-' + code, started: false, accepted: false, hostLost: false, lastHost: performance.now(),
-      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [], seenPeers: {}, epoch: 0, lostAt: 0, electT: 0,
+      events: [], peers: {}, remotes: {}, seen: { fp: 0, jp: 0, bp: 0 }, fp: 0, jp: 0, bp: 0, lastIn: '', myTeam: role === 'host' ? 0 : -1, roster: [], seenPeers: {}, epoch: 0, lostAt: 0, electT: 0, parts: null, pendingInit: null,
       pid: this.pid || this.storedPid() });
     // heartbeat on a timer (not the animation loop) so a backgrounded phone tab still counts as present
     this.hbTimer = setInterval(() => { if (this.joined) this.send(this.role === 'host' ? { t: 'hb', host: 1 } : { t: 'hb', pid: this.pid, team: this.myTeam }); }, 2000);
@@ -107,9 +108,17 @@ const Net = {
     newGame({ teams });
     this.sendInit();
   },
+  // Custom map: the image goes out in ~48 KB pieces just ahead of `init` (a broadcast packet has a size limit);
+  // a guest holds the init until every piece of that image id has arrived.
+  sendMapImage(to) {
+    const d = this.mapData, id = this.mapId, CH = 48000, n = Math.ceil(d.length / CH);
+    for (let i = 0; i < n; i++) this.send({ t: 'mi', host: 1, ep: this.epoch, to, id, i, n, d: d.slice(i * CH, (i + 1) * CH) });
+    return n;
+  },
   sendInit(to) {
+    if (g.mapStyle === 'Custom' && this.mapData) this.sendMapImage(to);
     const slots = {}; for (const k in this.peers) slots[k] = this.peers[k].team;
-    this.send({ t: 'init', host: 1, to, slots, ep: this.epoch, seed: g.seed, map: g.mapStyle, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: g.settings.turnTime, sdMinutes: g.settings.sdMinutes,
+    this.send({ t: 'init', host: 1, to, slots, ep: this.epoch, seed: g.seed, map: g.mapStyle, mapId: this.mapId, theme: g.theme, scheme: g.schemeName, perTeam: g.perTeam, turnTime: g.settings.turnTime, sdMinutes: g.settings.sdMinutes,
       teams: g.teams.map(t => ({ name: t.name, color: t.color })), log: this.log, snap: this.snap() });
   },
   onMsg(m) {
@@ -143,7 +152,15 @@ const Net = {
       if (m.ep !== undefined && (m.ep | 0) < this.epoch) return;   // a packet from a host that has since been replaced
       if (m.host) { this.lastHost = now; if (this.hostLost) { this.hostLost = false; UI.netStatus('Host is back!'); } }
       switch (m.t) {
-        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.epoch = m.ep | 0; this.setupGuest(m); break;
+        case 'mi': if (m.to && m.to !== this.pid) return;
+          if (!this.parts || this.parts.id !== m.id) this.parts = { id: m.id, n: m.n, got: 0, d: [] };
+          if (this.parts.d[m.i] === undefined) { this.parts.d[m.i] = m.d; this.parts.got++; }
+          if (this.pendingInit && this.parts.got === this.parts.n) this.customInit(this.pendingInit);
+          break;
+        case 'init': if (m.to && m.to !== this.pid) return; if (m.slots[this.pid] === undefined) return; this.accepted = true; this.epoch = m.ep | 0;
+          if (m.map === 'Custom') { this.pendingInit = m; if (this.mapId === m.mapId && MapImage.game) this.customInit(m); else if (this.parts && this.parts.id === m.mapId && this.parts.got === this.parts.n) this.customInit(m); else UI.netStatus('Downloading the host\'s map…'); }
+          else { MapImage.game = null; this.setupGuest(m); }
+          break;
         case 'takeover': if (m.pid !== this.pid) { this.epoch = m.ep | 0; this.hostLost = false; this.lastHost = now; this.accepted = false; UI.netStatus(`${g.teams[m.team] ? g.teams[m.team].name : 'A friend'} is hosting now`); } break;
         case 'roster': this.accepted = true; this.roster = m.list || []; this.renderRoster(); if (!this.started && !m.started) UI.netStatus(`Joined! ${this.roster.length} in the room – waiting for the host to start…`); break;
         case 'full': if (m.to === this.pid) { this.accepted = true; UI.netStatus(m.playing ? `That game is already in progress. If you were in it, rejoin with the same name you used (${Profile.name()}).` : 'That room is full (8 players).'); } break;
@@ -225,6 +242,16 @@ const Net = {
       c: g.critters.map(c => [c.id, c.team.idx, c.name, ...CRIT_F.map(f => nr(c[f])), c.say ? [c.say.text, nr(c.say.t)] : 0]),
       e: g.ents.filter(e => !(e instanceof Critter) && !e.dead).map(e => { const k = NET_KIND.get(e.constructor); if (!k) return null; if (e instanceof Rope) e.cId = e.c.id;
         return [k.code, e.id, nr(e.x), nr(e.y), nr(e.vx || 0), nr(e.vy || 0), ...k.f.map(f => nr(e[f]))]; }).filter(Boolean) };
+  },
+  customInit(m) {   // all pieces in (or the image is already here from before a rejoin): decode, then build the world
+    this.pendingInit = null;
+    const go = () => { if (this.role !== 'guest') return; this.setupGuest(m); UI.netStatus(''); };
+    if (this.mapId === m.mapId && MapImage.game) return go();
+    const data = this.parts.d.join(''); this.parts = null;
+    const im = new Image();
+    im.onload = () => { MapImage.game = im; this.mapData = data; this.mapId = m.mapId; go(); };   // kept so this guest can pass it on if it ever hosts
+    im.onerror = () => UI.netStatus('Could not load the host\'s map image.');
+    im.src = data;
   },
   setupGuest(m) {
     UI.hideAll(); this.started = true; this.hostLost = false; this.myTeam = m.slots[this.pid];
