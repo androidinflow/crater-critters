@@ -1,18 +1,18 @@
 // ============================== UI (HUD + DOM overlays) ==============================
-const HUD_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Roboto, system-ui, sans-serif';
+const HUD_FONT = 'Geist, -apple-system, BlinkMacSystemFont, Inter, "Segoe UI", Roboto, system-ui, sans-serif';
 // In-world text (names, damage numbers, banners): a soft dark outline keeps it legible over anything
 function txt(t, x, y, size, col, align = 'center', stroke = 4) {
   ctx.font = `700 ${size}px ${HUD_FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = stroke * 0.7; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y);
 }
 // HUD text: no outline, a 1px shadow
-function hud(t, x, y, size, col = '#eef2f8', align = 'left', weight = 600) {
+function hud(t, x, y, size, col = '#fafafa', align = 'left', weight = 600) {
   ctx.font = `${weight} ${size}px ${HUD_FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillText(t, x, y + 1); ctx.fillStyle = col; ctx.fillText(t, x, y);
+  ctx.fillStyle = col; ctx.fillText(t, x, y);
 }
-// HUD surface: the app's dark panel with a thin light edge
-function panel(x, y, w, h, r = 14, fill = 'rgba(15,22,38,0.84)') { rr(ctx, x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke(); }
-function glassCircle(x, y, r, fill = 'rgba(15,22,38,0.84)') { circ(ctx, x, y, r); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke(); }
+// HUD surface: the app's zinc card with a 1px zinc-800 border
+function panel(x, y, w, h, r = 10, fill = 'rgba(9,9,11,0.84)') { rr(ctx, x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(63,63,70,0.9)'; ctx.lineWidth = 1; ctx.stroke(); }
+function glassCircle(x, y, r, fill = 'rgba(9,9,11,0.84)') { circ(ctx, x, y, r); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = 'rgba(63,63,70,0.9)'; ctx.lineWidth = 1; ctx.stroke(); }
 // Minimap: cached shrunken copy of the terrain bitmap (refreshed when the terrain version changes)
 // with critter dots and the camera window. Click/tap it to look there.
 const Mini = {
@@ -29,7 +29,7 @@ const Mini = {
     const mx = portrait ? w - mw - 14 : w / 2 - mw / 2, my = portrait ? 166 : T ? 12 : h - 14 - rows * (rows > 4 ? 14 : 18) - mh - 10;
     this.rect = { x: mx, y: my, w: mw, h: mh };
     ctx.save();
-    panel(mx - 5, my - 5, mw + 10, mh + 10, 10); ctx.save(); rr(ctx, mx, my, mw, mh, 6); ctx.clip();
+    panel(mx - 5, my - 5, mw + 10, mh + 10, 9); ctx.save(); rr(ctx, mx, my, mw, mh, 5); ctx.clip();
     const sk = Terrain.theme.sky; ctx.fillStyle = Terrain.cavern ? '#2a1e3d' : sk[1]; ctx.globalAlpha = 0.6; ctx.fillRect(mx, my, mw, mh); ctx.globalAlpha = 1;
     ctx.drawImage(this.cvs, mx, my, mw, mh);
     const wy = my + g.waterY / CFG.H * mh; ctx.fillStyle = Terrain.theme.water[1]; ctx.fillRect(mx, wy, mw, my + mh - wy);
@@ -53,7 +53,7 @@ function drawHUD() {
     const s = worldToScreen(c.x, c.y - c.r * 1.6); if (s.x < -60 || s.x > w + 60 || s.y < -60 || s.y > h + 60) continue;
     txt(c.name, s.x, s.y - 26, 12, shade(c.team.color, 0.25), 'center', 3);
     const hp = Math.max(0, Math.ceil(c.hp)), bw = 30;
-    rr(ctx, s.x - bw / 2, s.y - 18, bw, 14, 7); ctx.fillStyle = 'rgba(15,22,38,0.8)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+    rr(ctx, s.x - bw / 2, s.y - 18, bw, 14, 4); ctx.fillStyle = 'rgba(9,9,11,0.82)'; ctx.fill(); ctx.strokeStyle = 'rgba(63,63,70,0.9)'; ctx.lineWidth = 1; ctx.stroke();
     ctx.font = `700 11px ${HUD_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = c.poison > 0 ? '#9be15d' : shade(c.team.color, 0.35); ctx.fillText(hp, s.x, s.y - 11);
     if (c === g.active && g.state === 'turn' && g.time - g.turnStartT < 3) {
       const by = s.y - 44 + Math.sin(g.time * 8) * 4; ctx.fillStyle = c.team.color; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5;
@@ -62,9 +62,9 @@ function drawHUD() {
     if (c.say) {
       ctx.font = `500 13px ${HUD_FONT}`; const tw = ctx.measureText(c.say.text).width + 18, by = s.y - 66;
       ctx.globalAlpha = Math.min(1, c.say.t * 3);
-      rr(ctx, s.x - tw / 2, by - 12, tw, 24, 12); ctx.fillStyle = 'rgba(255,255,255,0.94)'; ctx.fill();
+      rr(ctx, s.x - tw / 2, by - 12, tw, 24, 7); ctx.fillStyle = 'rgba(250,250,250,0.96)'; ctx.fill();
       ctx.beginPath(); ctx.moveTo(s.x - 5, by + 11); ctx.lineTo(s.x, by + 18); ctx.lineTo(s.x + 5, by + 11); ctx.fill();
-      ctx.fillStyle = '#16181f'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText(c.say.text, s.x, by); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#18181b'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText(c.say.text, s.x, by); ctx.globalAlpha = 1;
     }
   }
   for (const t of g.texts) { const s = worldToScreen(t.x, t.y); ctx.globalAlpha = clamp((t.life - t.t) * 2, 0, 1); txt(t.text, s.x, s.y - t.t * 34, t.size * (1 + Math.max(0, 0.3 - t.t)), t.col); }
@@ -79,19 +79,19 @@ function drawHUD() {
   if (team && g.state === 'turn') {
     const W = WEAP[g.weapon];
     ctx.save(); ctx.translate(14, 14); ctx.scale(ps, ps); ctx.translate(-14, -14);
-    panel(14, 14, 276, 72, 16);
-    rr(ctx, 24, 24, 52, 52, 12); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    panel(14, 14, 276, 72, 12);
+    rr(ctx, 24, 24, 52, 52, 8); ctx.fillStyle = '#27272a'; ctx.fill();
     ctx.save(); ctx.translate(50, 51); drawIcon(ctx, W.id, 38); ctx.restore();
     hud(W.name, 88, 33, 15);
     const a = team.ammo[W.id] ?? 0;
-    hud(a === -1 ? 'Unlimited' : a === 0 ? 'No ammo' : `${a} left`, 88, 52, 12, a === 0 ? '#ff7a8a' : 'rgba(238,242,248,0.7)', 'left', 500);
+    hud(a === -1 ? 'Unlimited' : a === 0 ? 'No ammo' : `${a} left`, 88, 52, 12, a === 0 ? '#f87171' : '#a1a1aa', 'left', 500);
     let hint = W.hint.replace('{fuse}', g.fuse).replace('{bee}', g.target ? 'Target locked! Hold Space.' : 'Click to set a target.');
     if (W.air && Terrain.cavern) hint = 'No air-drops in caverns!';
     if (g.robot) hint = g.robot.hint || 'Space: KABOOM!'; else if (g.shotsLeft === 1) hint = 'One more shot!';
     if (c.mode === 'chute') hint = '←→ drift · Space: close chute'; if (c.mode === 'kami') hint = 'BANZAI!';
     if (c.mode === 'rope') hint = '←→ swing · ↑↓ climb · Space let go'; if (c.mode === 'jet') hint = `↑ thrust · fuel ${Math.max(0, c.fuel).toFixed(1)}s`;
     if (T) hint = hint.replace('Hold Space', 'Hold FIRE').replace('Space again', 'FIRE again').replace('Space:', 'FIRE:').replace('Click', 'Tap').replace('click', 'tap').replace('keys 1–5', 'tap map').replace(' (tap map)', '');
-    hud(hint, 88, 69, 11, 'rgba(238,242,248,0.6)', 'left', 500);
+    hud(hint, 88, 69, 11, '#a1a1aa', 'left', 400);
     ctx.restore();
   }
   // timer
@@ -99,14 +99,14 @@ function drawHUD() {
     ctx.save(); ctx.translate(L.tx, L.ty); ctx.scale(L.ts, L.ts);
     const tx = 0, ty = 0, col = team ? team.color : '#aaa';
     glassCircle(tx, ty, 38);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 5; ctx.lineCap = 'round'; circ(ctx, tx, ty, 31); ctx.stroke();
+    ctx.strokeStyle = '#27272a'; ctx.lineWidth = 5; ctx.lineCap = 'round'; circ(ctx, tx, ty, 31); ctx.stroke();
     if (g.state === 'turn') {
       const frac = clamp(g.turnT / (g.retreat ? CFG.RETREAT : g.settings.turnTime), 0, 1);
       ctx.strokeStyle = g.retreat ? '#ff7b39' : col; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(tx, ty, 31, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke(); ctx.lineCap = 'butt';
       const v = Math.ceil(Math.max(0, g.turnT));
-      hud(v, tx, ty + 1, 26, g.turnT < 5 && (g.time * 4 | 0) % 2 ? '#ff5d73' : '#fff', 'center', 700);
+      hud(v, tx, ty + 1, 26, g.turnT < 5 && (g.time * 4 | 0) % 2 ? '#f87171' : '#fafafa', 'center', 600);
       if (g.retreat) txt('Run!', tx, ty - 50, 16, '#ff7b39');
-    } else { ctx.lineCap = 'butt'; hud('…', tx, ty, 24, 'rgba(238,242,248,0.6)', 'center'); }
+    } else { ctx.lineCap = 'butt'; hud('…', tx, ty, 24, '#a1a1aa', 'center'); }
     if (g.sd) txt('Sudden death', T ? tx : tx + 46, T ? ty + 52 : ty - 46, 13, '#ff5d73', T ? 'center' : 'left');
     else if (g.settings.sdMinutes > 0) { const left = Math.max(0, g.settings.sdMinutes * 60 - g.time); txt(`${left / 60 | 0}:${String(left % 60 | 0).padStart(2, '0')}`, tx, ty + 52, 12, 'rgba(255,255,255,0.85)'); }
     ctx.restore();
@@ -114,12 +114,12 @@ function drawHUD() {
   // wind meter
   {
     const ww = L.ww, wx = L.wx, wy = L.wy;
-    panel(wx, wy, ww, 36, 18);
-    hud('Wind', wx + 14, wy + 18, 11, 'rgba(238,242,248,0.7)', 'left', 600);
+    panel(wx, wy, ww, 36, 10);
+    hud('Wind', wx + 14, wy + 18, 12, '#a1a1aa', 'left', 500);
     const bx = wx + 52, bwid = ww - 66, mid = bx + bwid / 2, len = g.wind * (bwid / 2 - 4);
-    rr(ctx, bx, wy + 12, bwid, 12, 6); ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fill();
-    ctx.save(); rr(ctx, Math.min(mid, mid + len), wy + 12, Math.abs(len), 12, 6); ctx.clip();
-    ctx.fillStyle = 'rgba(95,176,255,0.6)'; ctx.fillRect(bx, wy + 12, bwid, 12);
+    rr(ctx, bx, wy + 12, bwid, 12, 4); ctx.fillStyle = '#27272a'; ctx.fill();
+    ctx.save(); rr(ctx, Math.min(mid, mid + len), wy + 12, Math.abs(len), 12, 4); ctx.clip();
+    ctx.fillStyle = 'rgba(96,165,250,0.7)'; ctx.fillRect(bx, wy + 12, bwid, 12);
     const dir = Math.sign(g.wind) || 1;
     for (let i = -2; i < 22; i++) { const px = bx + ((i * 14 + g.time * 40 * dir) % (bwid + 28)); ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.45)';
       ctx.beginPath(); ctx.moveTo(px, wy + 14); ctx.lineTo(px + 5 * dir, wy + 18); ctx.lineTo(px, wy + 22); ctx.lineTo(px + 4 * dir, wy + 22); ctx.lineTo(px + 9 * dir, wy + 18); ctx.lineTo(px + 4 * dir, wy + 14); ctx.fill(); }
@@ -135,9 +135,8 @@ function drawHUD() {
       const t = g.teams[i], tot = t.critters.reduce((s, c) => s + (c.alive ? Math.max(0, c.hp) : 0), 0), y = y0 + i * rowH;
       const bar = clamp(tot / (CFG.HP * (g.perTeam || CFG.PER_TEAM)), 0, 1.4) * (bw - 120);
       if (T) txt(t.name, x0 + 118 + Math.max(4, bar) + 6, y + 8, 11, '#fff', 'left', 3); else txt(t.name, x0 + 112, y + 8, 12, '#fff', 'right', 3);
-      const bh = rowH - 6; rr(ctx, x0 + 118, y + 2, bw - 120, bh, bh / 2); ctx.fillStyle = 'rgba(15,22,38,0.55)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.stroke();
-      rr(ctx, x0 + 119, y + 3, Math.max(bh - 2, Math.min(bar, bw - 122)), bh - 2, (bh - 2) / 2); ctx.fillStyle = t.color; ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.25)'; rr(ctx, x0 + 119, y + 3, Math.max(bh - 2, Math.min(bar, bw - 122)), (bh - 2) / 2, (bh - 2) / 2); ctx.fill();
+      const bh = rowH - 6; rr(ctx, x0 + 118, y + 2, bw - 120, bh, 3); ctx.fillStyle = 'rgba(9,9,11,0.6)'; ctx.fill(); ctx.strokeStyle = 'rgba(63,63,70,0.9)'; ctx.lineWidth = 1; ctx.stroke();
+      rr(ctx, x0 + 119, y + 3, Math.max(bh - 2, Math.min(bar, bw - 122)), bh - 2, 2); ctx.fillStyle = t.color; ctx.fill();
       if (g.state === 'turn' && team === t) { ctx.fillStyle = '#fff'; circ(ctx, x0 + 118 + (bw - 120) + 9, y + 8, 3); ctx.fill(); }
     }
   }
